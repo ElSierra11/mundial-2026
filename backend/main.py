@@ -760,6 +760,63 @@ def get_match_community_stats(match_id: int, db: Session = Depends(get_db)):
     )
 
 
+@app.get("/api/matches/{match_id}/predictions", response_model=schemas.MatchPredictionsResponse)
+def get_match_predictions(
+    match_id: int,
+    current_user: schemas.TokenData = Depends(auth.get_current_user_token),
+    db: Session = Depends(get_db)
+):
+    """
+    Returns all user predictions for a match.
+    Predictions are only visible when the match is locked (live or finished).
+    """
+    db_match = crud.get_match(db, match_id)
+    if not db_match:
+        raise HTTPException(status_code=404, detail="Partido no encontrado")
+
+    is_locked = db_match.status in ("live", "finished")
+
+    if not is_locked:
+        # Return empty list while predictions are still open
+        return schemas.MatchPredictionsResponse(
+            match_id=match_id,
+            is_locked=False,
+            predictions=[]
+        )
+
+    preds = db.query(models.Prediction).filter(models.Prediction.match_id == match_id).all()
+
+    result = []
+    for pred in preds:
+        user = crud.get_user(db, pred.user_id)
+        result.append(schemas.MatchPredictionItem(
+            user_id=pred.user_id,
+            display_name=user.display_name if user else "Usuario",
+            avatar_url=user.avatar_url if user else None,
+            home_prediction=pred.home_prediction,
+            away_prediction=pred.away_prediction,
+            points_earned=pred.points_earned
+        ))
+
+    # Sort: exact score first, then outcome correct, then wrong, then by points desc
+    def sort_key(p):
+        if p.points_earned == 3:
+            return 0
+        elif p.points_earned == 1:
+            return 1
+        elif p.points_earned == 0:
+            return 2
+        return 3
+
+    result.sort(key=sort_key)
+
+    return schemas.MatchPredictionsResponse(
+        match_id=match_id,
+        is_locked=True,
+        predictions=result
+    )
+
+
 @app.post("/api/groups", response_model=schemas.GroupResponse)
 def create_new_group(
     group: schemas.GroupCreate,

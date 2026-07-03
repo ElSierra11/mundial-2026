@@ -143,3 +143,19 @@ class EmailLoginRequest(BaseModel):
     password: str
 
 
+# Per-user prediction item for closed-match view
+class MatchPredictionItem(BaseModel):
+    user_id: str
+    display_name: Optional[str]
+    avatar_url: Optional[str]
+    home_prediction: int
+    away_prediction: int
+    points_earned: Optional[int] = None
+
+    class Config:
+        from_attributes = True
+
+class MatchPredictionsResponse(BaseModel):
+    match_id: int
+    is_locked: bool  # True if predictions are closed (live or finished)
+    predictions: List[MatchPredictionItem]

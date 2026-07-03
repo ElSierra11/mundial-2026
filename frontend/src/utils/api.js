@@ -569,6 +569,16 @@ export const api = {
     return await response.json();
   },
 
+  async getMatchPredictions(matchId) {
+    if (this.getMode() === "demo") {
+      // In demo mode return empty (no multi-user predictions)
+      return { match_id: matchId, is_locked: false, predictions: [] };
+    }
+    const response = await fetch(`${API_BASE_URL}/api/matches/${matchId}/predictions`, { headers: getHeaders() });
+    if (!response.ok) throw new Error("Error al obtener predicciones del partido");
+    return await response.json();
+  },
+
   // ─── Private Leagues / Groups ──────────────────────────────────────────────────
   async createGroup(name) {
     if (this.getMode() === "demo") {

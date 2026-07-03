@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Save, Lock, AlertCircle, CheckCircle2, Trophy, Share2, BarChart2 } from 'lucide-react';
+import { Save, Lock, AlertCircle, CheckCircle2, Trophy, Share2, BarChart2, Users, ChevronDown, ChevronUp } from 'lucide-react';
 import { api } from '../utils/api';
 
 export default function MatchCard({ match, prediction, onSavePrediction }) {
@@ -9,6 +9,11 @@ export default function MatchCard({ match, prediction, onSavePrediction }) {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState(false);
+
+  // All users' predictions (visible once match is locked)
+  const [matchPredictions, setMatchPredictions] = useState(null);
+  const [showPredictions, setShowPredictions] = useState(false);
+  const currentUserId = api.getCurrentUser()?.id;
 
   // Sync state with prediction prop
   useEffect(() => {
@@ -37,7 +42,20 @@ export default function MatchCard({ match, prediction, onSavePrediction }) {
       }
     };
     fetchStats();
-  }, [match.id, prediction]);
+
+    // Fetch all user predictions if match is locked
+    if (match.status !== 'scheduled') {
+      const fetchPreds = async () => {
+        try {
+          const data = await api.getMatchPredictions(match.id);
+          setMatchPredictions(data);
+        } catch (err) {
+          console.error("Error fetching match predictions:", err);
+        }
+      };
+      fetchPreds();
+    }
+  }, [match.id, match.status, prediction]);
 
 
   useEffect(() => {
@@ -312,6 +330,65 @@ export default function MatchCard({ match, prediction, onSavePrediction }) {
           </button>
         )}
       </div>
+
+      {/* 👥 All users' predictions - visible once match is locked */}
+      {isLocked && matchPredictions && matchPredictions.is_locked && matchPredictions.predictions.length > 0 && (
+        <div className="mt-3 border-t border-slate-900/50 pt-3">
+          <button
+            onClick={() => setShowPredictions(v => !v)}
+            className="w-full flex items-center justify-between text-[10px] font-bold text-slate-400 hover:text-slate-200 transition-colors uppercase tracking-wider"
+          >
+            <span className="flex items-center gap-1.5">
+              <Users className="w-3.5 h-3.5 text-brand-gold" />
+              Predicciones de todos ({matchPredictions.predictions.length})
+            </span>
+            {showPredictions ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
+          </button>
+
+          {showPredictions && (
+            <div className="mt-2 space-y-1 max-h-48 overflow-y-auto pr-1 scrollbar-thin scrollbar-track-transparent scrollbar-thumb-slate-800">
+              {matchPredictions.predictions.map((p) => {
+                const isMe = p.user_id === currentUserId;
+                const pts = p.points_earned;
+                let rowColor = 'bg-slate-950/30';
+                let ptsBadge = null;
+                if (pts === 3) {
+                  rowColor = 'bg-brand-gold/5 border border-brand-gold/20';
+                  ptsBadge = <span className="text-brand-gold font-bold text-[9px]">+3 🎯</span>;
+                } else if (pts === 1) {
+                  rowColor = 'bg-brand-accent/5 border border-brand-accent/15';
+                  ptsBadge = <span className="text-brand-accent font-bold text-[9px]">+1 ✓</span>;
+                } else if (pts === 0) {
+                  ptsBadge = <span className="text-slate-500 font-bold text-[9px]">+0</span>;
+                }
+                return (
+                  <div
+                    key={p.user_id}
+                    className={`flex items-center gap-2 px-2 py-1.5 rounded-lg ${rowColor} ${
+                      isMe ? 'ring-1 ring-brand-gold/30' : ''
+                    }`}
+                  >
+                    <img
+                      src={p.avatar_url || `https://api.dicebear.com/7.x/adventurer/svg?seed=${p.user_id}`}
+                      alt={p.display_name}
+                      className="w-5 h-5 rounded-full bg-slate-800 flex-shrink-0"
+                    />
+                    <span className={`text-[10px] font-semibold flex-1 truncate ${
+                      isMe ? 'text-brand-gold' : 'text-slate-300'
+                    }`}>
+                      {p.display_name}{isMe ? ' (Tú)' : ''}
+                    </span>
+                    <span className="text-[10px] font-bold text-white bg-slate-900 px-1.5 py-0.5 rounded">
+                      {p.home_prediction} - {p.away_prediction}
+                    </span>
+                    {ptsBadge}
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 }
