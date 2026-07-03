@@ -1,0 +1,13 @@
+fastapi
+uvicorn
+sqlalchemy
+pydantic
+email-validator
+google-auth
+pyjwt
+python-multipart
+requests
+httpx
+psycopg2-binary
+python-jose[cryptography]
+passlib[bcrypt]

@@ -1,0 +1,17 @@
+services:
+  - type: web
+    name: mundial-backend
+    env: python
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn main:app --host 0.0.0.0 --port $PORT
+    envVars:
+      - key: DATABASE_URL
+        sync: false   # Configurar manualmente en Render Dashboard (PostgreSQL URL de Supabase o Render)
+      - key: SECRET_KEY
+        generateValue: true  # Render genera un valor seguro automáticamente
+      - key: GOOGLE_CLIENT_ID
+        sync: false   # Configurar manualmente en Render Dashboard
+      - key: GOOGLE_CLIENT_SECRET
+        sync: false   # Configurar manualmente en Render Dashboard - NO hardcodear aquí
+      - key: FRONTEND_URL
+        sync: false   # Configurar manualmente una vez tengas la URL de Vercel
