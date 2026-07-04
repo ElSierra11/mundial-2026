@@ -273,8 +273,14 @@ export default function MatchCard({ match, prediction, onSavePrediction }) {
                 min="0"
                 max="99"
                 value={homePred}
+                onKeyDown={(e) => {
+                  if (['e', 'E', '+', '-', '.', ','].includes(e.key)) {
+                    e.preventDefault();
+                  }
+                }}
                 onChange={(e) => {
-                  setHomePred(e.target.value);
+                  const val = e.target.value.replace(/[^0-9]/g, '');
+                  setHomePred(val);
                   setIsEditing(true);
                 }}
                 disabled={isLocked}
@@ -286,8 +292,14 @@ export default function MatchCard({ match, prediction, onSavePrediction }) {
                 min="0"
                 max="99"
                 value={awayPred}
+                onKeyDown={(e) => {
+                  if (['e', 'E', '+', '-', '.', ','].includes(e.key)) {
+                    e.preventDefault();
+                  }
+                }}
                 onChange={(e) => {
-                  setAwayPred(e.target.value);
+                  const val = e.target.value.replace(/[^0-9]/g, '');
+                  setAwayPred(val);
                   setIsEditing(true);
                 }}
                 disabled={isLocked}
