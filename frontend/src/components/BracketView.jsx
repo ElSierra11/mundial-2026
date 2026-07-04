@@ -1,6 +1,15 @@
 import React, { useState, useMemo } from 'react';
 import { Clock, Lock, Radio, Trophy, MapPin, Sparkles, Check } from 'lucide-react';
 
+const parseISO = (str) => {
+  if (!str) return new Date();
+  if (typeof str !== 'string') return new Date(str);
+  if (!str.includes('Z') && !str.includes('+') && !str.match(/-\d{2}:\d{2}$/)) {
+    return new Date(str + 'Z');
+  }
+  return new Date(str);
+};
+
 // ─── Team Row ──────────────────────────────────────────────────────────────────
 function TeamRow({ name, flag, score, penScore, winner, tbd, isSimulating, isSimWinner, onClick }) {
   const isClickable = isSimulating && !tbd;
@@ -133,8 +142,12 @@ function BracketCard({ match, pred, isSimulating, simWinner, onSelectWinner }) {
           <>
             <Clock className="w-2.5 h-2.5 text-slate-700 flex-shrink-0" />
             <span className="text-[9px] text-slate-600">
-              {new Date(match.match_time).toLocaleDateString('es-CO', {
-                day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit',
+              {parseISO(match.match_time).toLocaleDateString('es-CO', {
+                weekday: 'short',
+                day: 'numeric',
+                month: 'short',
+                hour: '2-digit',
+                minute: '2-digit',
                 timeZone: 'America/Bogota'
               })}
             </span>
