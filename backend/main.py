@@ -14,6 +14,25 @@ from sqlalchemy import text
 from datetime import datetime, timedelta
 from typing import List
 
+# Run automatic migrations for new database columns
+def run_migrations():
+    from sqlalchemy import text
+    try:
+        with engine.connect() as conn:
+            conn.execute(text("SELECT home_penalties FROM matches LIMIT 1"))
+    except Exception:
+        print("[MIGRATION] Columns do not exist. Altering matches table...")
+        try:
+            with engine.begin() as trans_conn:
+                trans_conn.execute(text("ALTER TABLE matches ADD COLUMN home_penalties INTEGER"))
+                trans_conn.execute(text("ALTER TABLE matches ADD COLUMN away_penalties INTEGER"))
+                trans_conn.execute(text("ALTER TABLE matches ADD COLUMN penalties_winner VARCHAR"))
+            print("[MIGRATION] Database columns added successfully!")
+        except Exception as e:
+            print(f"[MIGRATION ERROR] Failed to run migration: {e}")
+
+run_migrations()
+
 # Create DB tables
 models.Base.metadata.create_all(bind=engine)
 
@@ -46,6 +65,7 @@ allowed_origins = [
 app.add_middleware(
     CORSMiddleware,
     allow_origins=allowed_origins,
+    allow_origin_regex="https://.*\\.vercel\\.app",
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
