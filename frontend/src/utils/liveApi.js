@@ -2,6 +2,7 @@
 // Falls back gracefully if API is unavailable
 
 const ESPN_URL = 'https://site.api.espn.com/apis/site/v2/sports/soccer/fifa.world/scoreboard';
+const ESPN_SUMMARY_URL = 'https://site.api.espn.com/apis/site/v2/sports/soccer/fifa.world/summary';
 
 // English → Spanish team name mapping for merging ESPN data with ours
 const TEAM_NAME_MAP = {
@@ -125,6 +126,114 @@ export function mergeLiveData(localMatches, liveMatches) {
       status: live.status !== 'scheduled' ? live.status : local.status,
       live_clock: live.clock,
       live_period: live.period,
+      espn_id: live.espn_id,
     };
   });
 }
+
+/**
+ * Fetches detailed match statistics from ESPN for a specific match.
+ * Finds the event by matching Spanish team names from the scoreboard,
+ * then fetches the event summary to get possession, shots, cards, goals.
+ * @param {string} homeTeamEs  - Home team name in Spanish (as stored in DB)
+ * @param {string} awayTeamEs  - Away team name in Spanish (as stored in DB)
+ * @returns {object|null}      - Match stats object or null on failure
+ */
+export async function fetchESPNMatchStats(homeTeamEs, awayTeamEs) {
+  try {
+    // Step 1: Fetch scoreboard to find the ESPN event ID
+    const boardRes = await fetch(ESPN_URL, {
+      signal: AbortSignal.timeout(6000),
+      headers: { 'Accept': 'application/json' },
+    });
+    if (!boardRes.ok) return null;
+    const boardData = await boardRes.json();
+    const events = boardData.events || [];
+
+    const homeNorm = homeTeamEs?.toLowerCase().trim();
+    const awayNorm = awayTeamEs?.toLowerCase().trim();
+
+    const matchedEvent = events.find(ev => {
+      const comp = ev.competitions?.[0];
+      if (!comp) return false;
+      const home = comp.competitors?.find(c => c.homeAway === 'home');
+      const away = comp.competitors?.find(c => c.homeAway === 'away');
+      const homeEs = normalizeTeamName(home?.team?.displayName || '').toLowerCase().trim();
+      const awayEs = normalizeTeamName(away?.team?.displayName || '').toLowerCase().trim();
+      return (homeEs === homeNorm && awayEs === awayNorm) ||
+             (homeEs === awayNorm && awayEs === homeNorm);
+    });
+
+    if (!matchedEvent) return null;
+    const eventId = matchedEvent.id;
+
+    // Step 2: Fetch event summary for full stats
+    const summaryRes = await fetch(`${ESPN_SUMMARY_URL}?event=${eventId}`, {
+      signal: AbortSignal.timeout(8000),
+      headers: { 'Accept': 'application/json' },
+    });
+    if (!summaryRes.ok) return null;
+    const summary = await summaryRes.json();
+
+    const comp = summary.header?.competitions?.[0];
+    const homeComp = comp?.competitors?.find(c => c.homeAway === 'home');
+    const awayComp = comp?.competitors?.find(c => c.homeAway === 'away');
+
+    // Parse team statistics
+    const teamStats = summary.boxscore?.teamStats || [];
+    const homeStats = teamStats.find(t => t.homeAway === 'home')?.stats || [];
+    const awayStats = teamStats.find(t => t.homeAway === 'away')?.stats || [];
+
+    const getStat = (statsArr, name) => {
+      const item = statsArr.find(s =>
+        s.name?.toLowerCase().includes(name.toLowerCase()) ||
+        s.abbreviation?.toLowerCase().includes(name.toLowerCase())
+      );
+      return item?.displayValue ?? item?.value ?? null;
+    };
+
+    // Parse goal scorers from keyPlays or drives
+    const keyEvents = summary.keyEvents || summary.plays || [];
+    const goals = keyEvents
+      .filter(e => e.type?.id === '60' || e.scoringPlay === true || e.text?.toLowerCase().includes('goal'))
+      .map(e => ({
+        team: e.team?.displayName ? normalizeTeamName(e.team.displayName) : null,
+        player: e.participants?.[0]?.athlete?.displayName || e.athleteId1Name || null,
+        clock: e.clock?.displayValue || e.period?.number ? `${e.period?.number || ''}' ${e.clock?.displayValue || ''}`.trim() : null,
+        type: e.type?.text || 'Gol',
+      }))
+      .filter(g => g.player || g.team);
+
+    return {
+      eventId,
+      homeTeam: normalizeTeamName(homeComp?.team?.displayName || homeTeamEs),
+      awayTeam: normalizeTeamName(awayComp?.team?.displayName || awayTeamEs),
+      // Possession
+      homePossession: getStat(homeStats, 'possession') || getStat(homeStats, 'poss'),
+      awayPossession: getStat(awayStats, 'possession') || getStat(awayStats, 'poss'),
+      // Shots
+      homeShotsOn: getStat(homeStats, 'shotsOnTarget') || getStat(homeStats, 'shot'),
+      awayShotsOn: getStat(awayStats, 'shotsOnTarget') || getStat(awayStats, 'shot'),
+      homeShotsTotal: getStat(homeStats, 'totalShots') || getStat(homeStats, 'shots'),
+      awayShotsTotal: getStat(awayStats, 'totalShots') || getStat(awayStats, 'shots'),
+      // Fouls & cards
+      homeFouls: getStat(homeStats, 'fouls'),
+      awayFouls: getStat(awayStats, 'fouls'),
+      homeYellows: getStat(homeStats, 'yellowCard') || getStat(homeStats, 'yellow'),
+      awayYellows: getStat(awayStats, 'yellowCard') || getStat(awayStats, 'yellow'),
+      homeReds: getStat(homeStats, 'redCard') || getStat(homeStats, 'red'),
+      awayReds: getStat(awayStats, 'redCard') || getStat(awayStats, 'red'),
+      // Corners & offsides
+      homeCorners: getStat(homeStats, 'corners'),
+      awayCorners: getStat(awayStats, 'corners'),
+      homeOffsides: getStat(homeStats, 'offsides'),
+      awayOffsides: getStat(awayStats, 'offsides'),
+      // Goals
+      goals,
+    };
+  } catch (e) {
+    console.warn('[LiveAPI] fetchESPNMatchStats failed:', e.message);
+    return null;
+  }
+}
+

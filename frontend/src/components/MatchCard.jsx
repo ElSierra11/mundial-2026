@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { Save, Lock, AlertCircle, CheckCircle2, Trophy, Share2, BarChart2, Users, ChevronDown, ChevronUp } from 'lucide-react';
+import { Save, Lock, AlertCircle, CheckCircle2, Trophy, Share2, BarChart2, Users, ChevronDown, ChevronUp, Activity, Target, Flag, Minus } from 'lucide-react';
 import { api } from '../utils/api';
+import { fetchESPNMatchStats } from '../utils/liveApi';
 
 const parseISO = (str) => {
   if (!str) return new Date();
@@ -40,6 +41,11 @@ export default function MatchCard({ match, prediction, onSavePrediction }) {
   // 📊 Community Match Stats State
   const [stats, setStats] = useState(null);
 
+  // 📡 ESPN Live/Post Match Stats
+  const [espnStats, setEspnStats] = useState(null);
+  const [showEspnStats, setShowEspnStats] = useState(false);
+  const [loadingEspn, setLoadingEspn] = useState(false);
+
   useEffect(() => {
     const fetchStats = async () => {
       try {
@@ -64,6 +70,27 @@ export default function MatchCard({ match, prediction, onSavePrediction }) {
       fetchPreds();
     }
   }, [match.id, match.status, prediction]);
+
+  // Fetch ESPN stats when match is live or finished
+  useEffect(() => {
+    if (match.status !== 'live' && match.status !== 'finished') return;
+    let cancelled = false;
+    const load = async () => {
+      setLoadingEspn(true);
+      const s = await fetchESPNMatchStats(match.home_team, match.away_team);
+      if (!cancelled) {
+        setEspnStats(s);
+        setLoadingEspn(false);
+      }
+    };
+    load();
+    // Re-fetch every 60s if live
+    let interval = null;
+    if (match.status === 'live') {
+      interval = setInterval(load, 60000);
+    }
+    return () => { cancelled = true; if (interval) clearInterval(interval); };
+  }, [match.id, match.status, match.home_team, match.away_team]);
 
 
   useEffect(() => {
@@ -307,6 +334,112 @@ export default function MatchCard({ match, prediction, onSavePrediction }) {
               </span>
             )}
           </span>
+        </div>
+      )}
+
+      {/* 📡 ESPN Match Statistics Panel */}
+      {(match.status === 'live' || match.status === 'finished') && (
+        <div className="mb-3">
+          <button
+            onClick={() => setShowEspnStats(v => !v)}
+            className="w-full flex items-center justify-between text-[10px] font-bold text-slate-400 hover:text-slate-200 transition-colors uppercase tracking-wider py-1.5 px-1"
+          >
+            <span className="flex items-center gap-1.5">
+              <Activity className="w-3.5 h-3.5 text-brand-gold" />
+              Estadísticas del Partido (ESPN)
+            </span>
+            {showEspnStats ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
+          </button>
+
+          {showEspnStats && (
+            <div className="mt-2 rounded-xl bg-slate-950/50 border border-slate-900/70 p-3 space-y-3 animate-[fadeIn_0.2s_ease-out]">
+              {loadingEspn && !espnStats ? (
+                <div className="flex items-center justify-center py-5 gap-2">
+                  <div className="w-4 h-4 border-2 border-brand-gold border-t-transparent rounded-full animate-spin" />
+                  <span className="text-[10px] text-slate-500 font-semibold">Cargando estadísticas ESPN...</span>
+                </div>
+              ) : !espnStats ? (
+                <div className="py-4 text-center">
+                  <span className="text-[10px] text-slate-600 italic">Estadísticas no disponibles para este partido aún.</span>
+                </div>
+              ) : (
+                <>
+                  {/* Team Headers */}
+                  <div className="grid grid-cols-3 text-center text-[9px] font-black uppercase tracking-widest text-slate-400 pb-1 border-b border-slate-900">
+                    <span className="text-left truncate text-slate-300">{match.home_team}</span>
+                    <span className="text-slate-600">Stat</span>
+                    <span className="text-right truncate text-slate-300">{match.away_team}</span>
+                  </div>
+
+                  {/* Possession Bar */}
+                  {(espnStats.homePossession || espnStats.awayPossession) && (
+                    <div className="space-y-1">
+                      <div className="grid grid-cols-3 text-center text-[10px] font-bold">
+                        <span className="text-left text-brand-accent">{espnStats.homePossession ?? '–'}%</span>
+                        <span className="text-slate-500 text-[9px] uppercase tracking-wide">Posesión</span>
+                        <span className="text-right text-brand-purple">{espnStats.awayPossession ?? '–'}%</span>
+                      </div>
+                      <div className="w-full h-2 rounded-full overflow-hidden bg-slate-900 flex">
+                        <div
+                          className="h-full bg-brand-accent transition-all duration-500"
+                          style={{ width: `${parseFloat(espnStats.homePossession) || 50}%` }}
+                        />
+                        <div
+                          className="h-full bg-brand-purple transition-all duration-500"
+                          style={{ width: `${parseFloat(espnStats.awayPossession) || 50}%` }}
+                        />
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Stat Rows */}
+                  {[
+                    { label: 'Tiros Totales', home: espnStats.homeShotsTotal, away: espnStats.awayShotsTotal, icon: <Target className="w-3 h-3" /> },
+                    { label: 'Al Arco', home: espnStats.homeShotsOn, away: espnStats.awayShotsOn, icon: <Target className="w-3 h-3 text-brand-gold" /> },
+                    { label: 'Corners', home: espnStats.homeCorners, away: espnStats.awayCorners, icon: <Flag className="w-3 h-3" /> },
+                    { label: 'Faltas', home: espnStats.homeFouls, away: espnStats.awayFouls, icon: <Minus className="w-3 h-3" /> },
+                    { label: '🟨 Amarillas', home: espnStats.homeYellows, away: espnStats.awayYellows, icon: null },
+                    { label: '🟥 Rojas', home: espnStats.homeReds, away: espnStats.awayReds, icon: null },
+                    { label: 'Fueras de Juego', home: espnStats.homeOffsides, away: espnStats.awayOffsides, icon: null },
+                  ].filter(r => r.home != null || r.away != null).map((row, i) => {
+                    const hVal = parseFloat(row.home) || 0;
+                    const aVal = parseFloat(row.away) || 0;
+                    const total = hVal + aVal || 1;
+                    return (
+                      <div key={i} className="grid grid-cols-3 items-center text-[10px] font-semibold">
+                        <span className={`text-left font-bold ${
+                          hVal > aVal ? 'text-brand-accent' : hVal === aVal ? 'text-slate-300' : 'text-slate-500'
+                        }`}>{row.home ?? '–'}</span>
+                        <span className="text-center text-slate-500 text-[9px] flex items-center justify-center gap-0.5">
+                          {row.icon}{row.label}
+                        </span>
+                        <span className={`text-right font-bold ${
+                          aVal > hVal ? 'text-brand-purple' : aVal === hVal ? 'text-slate-300' : 'text-slate-500'
+                        }`}>{row.away ?? '–'}</span>
+                      </div>
+                    );
+                  })}
+
+                  {/* Goal Scorers */}
+                  {espnStats.goals?.length > 0 && (
+                    <div className="pt-2 border-t border-slate-900 space-y-1">
+                      <p className="text-[9px] font-black uppercase tracking-widest text-slate-500 flex items-center gap-1">
+                        <Trophy className="w-3 h-3 text-brand-gold" /> Goles
+                      </p>
+                      {espnStats.goals.map((g, i) => (
+                        <div key={i} className="flex items-center gap-2 text-[10px]">
+                          <span className="text-brand-gold font-bold">⚽</span>
+                          <span className="text-slate-300 font-semibold flex-1">{g.player || g.team}</span>
+                          {g.clock && <span className="text-slate-500 text-[9px] shrink-0">{g.clock}</span>}
+                          {g.type && g.type !== 'Gol' && <span className="text-slate-600 text-[9px] shrink-0">{g.type}</span>}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </>
+              )}
+            </div>
+          )}
         </div>
       )}
 
