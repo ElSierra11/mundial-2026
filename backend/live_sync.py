@@ -284,6 +284,20 @@ def sync_scores_to_db(events: list[dict]):
                         if is_winner:
                             espn_penalties_winner = normalized
 
+                # Parse official date/time of the match from ESPN
+                date_str = event.get("date")
+                espn_time = None
+                if date_str:
+                    try:
+                        if date_str.endswith("Z"):
+                            espn_time = datetime.strptime(date_str[:16], "%Y-%m-%dT%H:%M")
+                        else:
+                            from datetime import timezone
+                            dt_obj = datetime.fromisoformat(date_str.replace("Z", "+00:00"))
+                            espn_time = dt_obj.astimezone(timezone.utc).replace(tzinfo=None)
+                    except Exception as e:
+                        logger.warning(f"Error parsing date from ESPN: {e}")
+
                 # Solo actualizar si hay cambios reales
                 status_changed = (db_match.status != espn_status)
                 score_changed = (
@@ -295,14 +309,17 @@ def sync_scores_to_db(events: list[dict]):
                     db_match.away_penalties != espn_away_penalties or
                     db_match.penalties_winner != espn_penalties_winner
                 )
+                time_changed = (espn_time is not None and db_match.match_time != espn_time)
                 
-                if status_changed or score_changed or penalties_changed:
+                if status_changed or score_changed or penalties_changed or time_changed:
                     old_status = db_match.status
                     
                     if espn_home_score is not None:
                         db_match.home_score = espn_home_score
                     if espn_away_score is not None:
                         db_match.away_score = espn_away_score
+                    if espn_time is not None:
+                        db_match.match_time = espn_time
                     
                     db_match.home_penalties = espn_home_penalties
                     db_match.away_penalties = espn_away_penalties

@@ -17,6 +17,8 @@ from typing import List
 # Run automatic migrations for new database columns
 def run_migrations():
     from sqlalchemy import text
+    from database import SessionLocal
+    import crud
     try:
         with engine.connect() as conn:
             conn.execute(text("SELECT home_penalties FROM matches LIMIT 1"))
@@ -30,6 +32,19 @@ def run_migrations():
             print("[MIGRATION] Database columns added successfully!")
         except Exception as e:
             print(f"[MIGRATION ERROR] Failed to run migration: {e}")
+
+    # Self-healing loop: Make sure all finished matches are advanced in the bracket
+    try:
+        db = SessionLocal()
+        finished = db.query(models.Match).filter(models.Match.status == "finished").all()
+        print(f"[MIGRATION] Found {len(finished)} finished matches to check for bracket advancement.")
+        for m in finished:
+            crud.advance_bracket_winner(db, m.id)
+            crud.recalculate_points_for_match(db, m.id)
+        db.close()
+        print("[MIGRATION] Bracket advancement verification complete!")
+    except Exception as e:
+        print(f"[MIGRATION ERROR] Failed to run self-healing check: {e}")
 
 run_migrations()
 
@@ -550,6 +565,12 @@ def update_match_score(
     
     if not updated_match:
         raise HTTPException(status_code=404, detail="Partido no encontrado")
+        
+    # Auto-advance and recalculate points if finished
+    if score_update.status == "finished":
+        crud.recalculate_points_for_match(db, match_id)
+        crud.advance_bracket_winner(db, match_id)
+        db.refresh(updated_match)
         
     return updated_match
 
