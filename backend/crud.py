@@ -38,6 +38,7 @@ def get_users_leaderboard(db: Session):
         previous_points = user.points
         
         user_dict = {
+            "id": user.id,
             "display_name": user.display_name or user.email.split("@")[0],
             "avatar_url": user.avatar_url,
             "points": user.points,
@@ -111,7 +112,114 @@ def guess_flag_url(team_name: str) -> str:
     code = country_codes.get(name, "un")  # default to "un" (United Nations) flag if not found
     return f"https://flagcdn.com/w160/{code}.png"
 
-def update_match_results(db: Session, match_id: int, home_score: int, away_score: int, status: str, home_team: str = None, away_team: str = None):
+# ─── Bracket auto-advance ───────────────────────────────────────────────────
+# Propagates the winner (and, for the 3rd place match, the loser) of a
+# finished knockout match into the following round's match slot.
+#
+# This assumes the fixed match ID layout created by /api/admin/reset_db and
+# reset_db_2026.py:
+#   Ronda de 32   = ids 1-16
+#   Octavos       = ids 17-24
+#   Cuartos       = ids 25-28
+#   Semifinal     = ids 29-30
+#   3er Puesto    = id 31
+#   Final         = id 32
+#
+# Format: source_match_id -> [(target_match_id, "home"|"away", "winner"|"loser"), ...]
+BRACKET_ADVANCE_MAP = {
+    1: [(17, "home", "winner")],
+    2: [(17, "away", "winner")],
+    3: [(18, "home", "winner")],
+    4: [(18, "away", "winner")],
+    5: [(19, "home", "winner")],
+    6: [(19, "away", "winner")],
+    7: [(20, "home", "winner")],
+    8: [(20, "away", "winner")],
+    9: [(22, "home", "winner")],
+    10: [(22, "away", "winner")],
+    11: [(21, "away", "winner")],
+    12: [(21, "home", "winner")],
+    13: [(24, "home", "winner")],
+    14: [(23, "away", "winner")],
+    15: [(23, "home", "winner")],
+    16: [(24, "away", "winner")],
+    17: [(25, "home", "winner")],
+    18: [(25, "away", "winner")],
+    19: [(26, "home", "winner")],
+    20: [(26, "away", "winner")],
+    21: [(27, "home", "winner")],
+    22: [(27, "away", "winner")],
+    23: [(28, "home", "winner")],
+    24: [(28, "away", "winner")],
+    25: [(29, "home", "winner")],
+    26: [(29, "away", "winner")],
+    27: [(30, "home", "winner")],
+    28: [(30, "away", "winner")],
+    29: [(32, "home", "winner"), (31, "home", "loser")],
+    30: [(32, "away", "winner"), (31, "away", "loser")],
+}
+
+
+def _match_outcome(db_match, side: str):
+    """
+    Returns (team_name, flag_url) for the winner/loser of a finished match.
+    Returns None if the match isn't finished, has no score yet, or ended in
+    a scoreline draw without penalties_winner yet.
+    """
+    if db_match.status != "finished":
+        return None
+    if db_match.home_score is None or db_match.away_score is None:
+        return None
+    if db_match.home_score == db_match.away_score:
+        if db_match.penalties_winner:
+            home_won = (db_match.penalties_winner == db_match.home_team)
+        else:
+            return None  # Decided by penalties — needs winner to advance
+    else:
+        home_won = db_match.home_score > db_match.away_score
+
+    if side == "winner":
+        return (db_match.home_team, db_match.home_flag_url) if home_won else (db_match.away_team, db_match.away_flag_url)
+    else:
+        return (db_match.away_team, db_match.away_flag_url) if home_won else (db_match.home_team, db_match.home_flag_url)
+
+
+def advance_bracket_winner(db: Session, match_id: int):
+    """Pushes the outcome of a finished knockout match into whatever match(es)
+    depend on it, so the next round shows the real team name instead of a
+    placeholder like 'Argentina / Cabo Verde'."""
+    targets = BRACKET_ADVANCE_MAP.get(match_id)
+    if not targets:
+        return
+
+    db_match = get_match(db, match_id)
+    if not db_match:
+        return
+
+    changed = False
+    for target_id, slot, side in targets:
+        outcome = _match_outcome(db_match, side)
+        if not outcome:
+            continue
+        team_name, flag_url = outcome
+
+        target_match = get_match(db, target_id)
+        if not target_match:
+            continue
+
+        if slot == "home":
+            target_match.home_team = team_name
+            target_match.home_flag_url = flag_url
+        else:
+            target_match.away_team = team_name
+            target_match.away_flag_url = flag_url
+        changed = True
+
+    if changed:
+        db.commit()
+
+
+def update_match_results(db: Session, match_id: int, home_score: int, away_score: int, status: str, home_team: str = None, away_team: str = None, home_penalties: int = None, away_penalties: int = None, penalties_winner: str = None):
     db_match = get_match(db, match_id)
     if not db_match:
         return None
@@ -120,6 +228,12 @@ def update_match_results(db: Session, match_id: int, home_score: int, away_score
         db_match.home_score = home_score
     if away_score is not None:
         db_match.away_score = away_score
+    if home_penalties is not None:
+        db_match.home_penalties = home_penalties
+    if away_penalties is not None:
+        db_match.away_penalties = away_penalties
+    if penalties_winner is not None:
+        db_match.penalties_winner = penalties_winner
     if status is not None:
         db_match.status = status
     if home_team is not None:
@@ -135,6 +249,10 @@ def update_match_results(db: Session, match_id: int, home_score: int, away_score
     # Trigger score recalculation
     recalculate_points_for_match(db, match_id)
     recalculate_all_user_points(db)
+
+    # Auto-advance the winner (and loser, for the 3rd place match) into
+    # whichever next-round match depends on this one.
+    advance_bracket_winner(db, match_id)
     
     return db_match
 
@@ -322,6 +440,7 @@ def get_group_leaderboard(db: Session, group_id: int):
         previous_points = user.points
         
         user_dict = {
+            "id": user.id,
             "display_name": user.display_name or user.email.split("@")[0],
             "avatar_url": user.avatar_url,
             "points": user.points,

@@ -14,7 +14,12 @@ export default function AdminPanel({ matches, onUpdateScore, onRecalculate, onRe
     const current = editingScores[matchId] || {
       home: matches.find(m => m.id === matchId).home_score ?? '',
       away: matches.find(m => m.id === matchId).away_score ?? '',
-      status: matches.find(m => m.id === matchId).status
+      status: matches.find(m => m.id === matchId).status,
+      home_team: matches.find(m => m.id === matchId).home_team,
+      away_team: matches.find(m => m.id === matchId).away_team,
+      home_penalties: matches.find(m => m.id === matchId).home_penalties ?? '',
+      away_penalties: matches.find(m => m.id === matchId).away_penalties ?? '',
+      penalties_winner: matches.find(m => m.id === matchId).penalties_winner ?? ''
     };
 
     setEditingScores({
@@ -38,6 +43,13 @@ export default function AdminPanel({ matches, onUpdateScore, onRecalculate, onRe
       return;
     }
 
+    // Validation for knockout tie penalty winner
+    const isDraw = editState.home !== '' && editState.away !== '' && parseInt(editState.home) === parseInt(editState.away);
+    if (!isTBD && match.stage !== 'Fase de Grupos' && isDraw && (editState.status === 'finished' || editState.status === 'live') && !editState.penalties_winner) {
+      alert("Para empates en rondas eliminatorias, debes seleccionar un ganador por penales.");
+      return;
+    }
+
     setLoadingMatchId(matchId);
     setFeedback('');
     try {
@@ -48,6 +60,9 @@ export default function AdminPanel({ matches, onUpdateScore, onRecalculate, onRe
         editState.status,
         editState.home_team || null,
         editState.away_team || null,
+        editState.home_penalties !== '' ? parseInt(editState.home_penalties) : null,
+        editState.away_penalties !== '' ? parseInt(editState.away_penalties) : null,
+        editState.penalties_winner || null
       );
       // Clean editing state for this match
       const updated = { ...editingScores };
@@ -228,6 +243,39 @@ export default function AdminPanel({ matches, onUpdateScore, onRecalculate, onRe
                           onChange={(e) => handleInputChange(match.id, 'away', e.target.value)}
                           className="w-10 h-7 text-center bg-transparent focus:outline-none text-sm font-black text-white"
                         />
+                      </div>
+                    )}
+
+                    {/* Penalty Shootout Inputs (for knockout tie matches) */}
+                    {!isTBD && match.stage !== 'Fase de Grupos' && currentEdit.home !== '' && currentEdit.away !== '' && parseInt(currentEdit.home) === parseInt(currentEdit.away) && (currentEdit.status === 'finished' || currentEdit.status === 'live') && (
+                      <div className="flex flex-col items-center gap-1 p-2 rounded-xl bg-slate-950/85 border border-brand-purple/20">
+                        <span className="text-[8px] font-bold text-brand-purple uppercase tracking-wider">Penales</span>
+                        <div className="flex items-center gap-1 py-1 px-2 rounded bg-slate-900 border border-slate-950/50">
+                          <input
+                            type="number"
+                            placeholder="-"
+                            value={currentEdit.home_penalties}
+                            onChange={(e) => handleInputChange(match.id, 'home_penalties', e.target.value)}
+                            className="w-8 h-6 text-center bg-transparent focus:outline-none text-xs font-extrabold text-slate-300"
+                          />
+                          <span className="text-slate-700 text-[10px]">-</span>
+                          <input
+                            type="number"
+                            placeholder="-"
+                            value={currentEdit.away_penalties}
+                            onChange={(e) => handleInputChange(match.id, 'away_penalties', e.target.value)}
+                            className="w-8 h-6 text-center bg-transparent focus:outline-none text-xs font-extrabold text-slate-300"
+                          />
+                        </div>
+                        <select
+                          value={currentEdit.penalties_winner || ''}
+                          onChange={(e) => handleInputChange(match.id, 'penalties_winner', e.target.value)}
+                          className="bg-slate-900 border border-slate-950/80 text-[9px] font-bold rounded px-1.5 py-0.5 text-slate-400 focus:outline-none focus:border-brand-purple"
+                        >
+                          <option value="">¿Ganador?</option>
+                          <option value={match.home_team}>{match.home_team}</option>
+                          <option value={match.away_team}>{match.away_team}</option>
+                        </select>
                       </div>
                     )}
 

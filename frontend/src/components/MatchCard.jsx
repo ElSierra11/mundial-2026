@@ -2,6 +2,14 @@ import React, { useState, useEffect } from 'react';
 import { Save, Lock, AlertCircle, CheckCircle2, Trophy, Share2, BarChart2, Users, ChevronDown, ChevronUp } from 'lucide-react';
 import { api } from '../utils/api';
 
+const parseISO = (str) => {
+  if (!str) return new Date();
+  if (!str.includes('Z') && !str.includes('+') && !str.match(/-\d{2}:\d{2}$/)) {
+    return new Date(str + 'Z');
+  }
+  return new Date(str);
+};
+
 export default function MatchCard({ match, prediction, onSavePrediction }) {
   const [homePred, setHomePred] = useState('');
   const [awayPred, setAwayPred] = useState('');
@@ -65,7 +73,7 @@ export default function MatchCard({ match, prediction, onSavePrediction }) {
     }
 
     const updateTimer = () => {
-      const difference = new Date(match.match_time) - new Date();
+      const difference = parseISO(match.match_time) - new Date();
       if (difference <= 0) {
         setTimeLeft('¡Iniciando partido!');
         return;
@@ -114,7 +122,7 @@ export default function MatchCard({ match, prediction, onSavePrediction }) {
   };
 
   const formatDate = (dateStr) => {
-    const date = new Date(dateStr);
+    const date = parseISO(dateStr);
     return date.toLocaleDateString('es-CO', {
       weekday: 'short',
       day: 'numeric',
@@ -287,8 +295,13 @@ export default function MatchCard({ match, prediction, onSavePrediction }) {
               {match.status === 'live' ? 'En Vivo' : 'Marcador Real'}
             </span>
           </div>
-          <span className="text-sm font-extrabold text-white">
-            {match.home_score} - {match.away_score}
+          <span className="text-sm font-extrabold text-white flex items-center gap-1.5">
+            <span>{match.home_score} - {match.away_score}</span>
+            {match.home_penalties !== null && match.away_penalties !== null && (
+              <span className="text-[10.5px] font-bold text-slate-400 bg-slate-900/60 py-0.5 px-1.5 rounded-md border border-slate-850">
+                ({match.home_penalties} - {match.away_penalties} Pen)
+              </span>
+            )}
           </span>
         </div>
       )}

@@ -258,20 +258,56 @@ def sync_scores_to_db(events: list[dict]):
                 
                 espn_status, espn_home_score, espn_away_score = parse_espn_status(event)
                 
+                # Parse penalty shootout scores and winner from competitors
+                espn_home_penalties = None
+                espn_away_penalties = None
+                espn_penalties_winner = None
+                
+                for comp in competitors:
+                    shootout_val = None
+                    if "shootoutScore" in comp:
+                        try:
+                            shootout_val = int(comp["shootoutScore"])
+                        except (ValueError, TypeError):
+                            pass
+                    
+                    is_winner = comp.get("winner", False)
+                    team_name = comp.get("team", {}).get("displayName", "")
+                    normalized = normalize_team(team_name)
+                    
+                    if comp.get("homeAway") == "home":
+                        espn_home_penalties = shootout_val
+                        if is_winner:
+                            espn_penalties_winner = normalized
+                    elif comp.get("homeAway") == "away":
+                        espn_away_penalties = shootout_val
+                        if is_winner:
+                            espn_penalties_winner = normalized
+
                 # Solo actualizar si hay cambios reales
                 status_changed = (db_match.status != espn_status)
                 score_changed = (
                     db_match.home_score != espn_home_score or
                     db_match.away_score != espn_away_score
                 )
+                penalties_changed = (
+                    db_match.home_penalties != espn_home_penalties or
+                    db_match.away_penalties != espn_away_penalties or
+                    db_match.penalties_winner != espn_penalties_winner
+                )
                 
-                if status_changed or score_changed:
+                if status_changed or score_changed or penalties_changed:
                     old_status = db_match.status
                     
                     if espn_home_score is not None:
                         db_match.home_score = espn_home_score
                     if espn_away_score is not None:
                         db_match.away_score = espn_away_score
+                    
+                    db_match.home_penalties = espn_home_penalties
+                    db_match.away_penalties = espn_away_penalties
+                    db_match.penalties_winner = espn_penalties_winner
+                    
                     if espn_status in ("live", "finished", "scheduled"):
                         db_match.status = espn_status
                     
@@ -279,15 +315,16 @@ def sync_scores_to_db(events: list[dict]):
                     
                     logger.info(
                         f"[LiveSync] Actualizado: {db_match.home_team} vs {db_match.away_team} "
-                        f"| {espn_home_score}-{espn_away_score} | {espn_status}"
+                        f"| {espn_home_score}-{espn_away_score} (Pens: {espn_home_penalties}-{espn_away_penalties}, Winner: {espn_penalties_winner}) | {espn_status}"
                     )
                     
-                    # Si el partido acabo, recalcular puntos
+                    # Si el partido acabo, recalcular puntos y avanzar la llave
                     if espn_status == "finished" and old_status != "finished":
                         crud.recalculate_points_for_match(db, db_match.id)
+                        crud.advance_bracket_winner(db, db_match.id)
                         recalculate_needed = True
                         logger.info(
-                            f"[LiveSync] Partido terminado! Recalculando puntos para match_id={db_match.id}"
+                            f"[LiveSync] Partido terminado! Recalculando puntos y avanzando llave para match_id={db_match.id}"
                         )
             
             except Exception as e:

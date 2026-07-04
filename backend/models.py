@@ -28,6 +28,9 @@ class Match(Base):
     stage = Column(String, default="Fase de Grupos")  # 'Fase de Grupos', 'Octavos', 'Cuartos', 'Semifinal', 'Final'
     home_score = Column(Integer, nullable=True)  # Null if not played
     away_score = Column(Integer, nullable=True)  # Null if not played
+    home_penalties = Column(Integer, nullable=True)
+    away_penalties = Column(Integer, nullable=True)
+    penalties_winner = Column(String, nullable=True)
     status = Column(String, default="scheduled")  # 'scheduled', 'live', 'finished'
 
     predictions = relationship("Prediction", back_populates="match", cascade="all, delete-orphan")

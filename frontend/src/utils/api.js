@@ -342,7 +342,7 @@ export const api = {
   },
 
   // Admin Actions
-  async adminUpdateMatchScore(matchId, homeScore, awayScore, status, homeTeam = null, awayTeam = null) {
+  async adminUpdateMatchScore(matchId, homeScore, awayScore, status, homeTeam = null, awayTeam = null, homePenalties = null, awayPenalties = null, penaltiesWinner = null) {
     if (this.getMode() === "demo") {
       const matches = JSON.parse(localStorage.getItem("demo_matches"));
       const matchIndex = matches.findIndex(m => m.id === matchId);
@@ -350,6 +350,9 @@ export const api = {
 
       if (homeScore !== null && homeScore !== '') matches[matchIndex].home_score = parseInt(homeScore);
       if (awayScore !== null && awayScore !== '') matches[matchIndex].away_score = parseInt(awayScore);
+      if (homePenalties !== null && homePenalties !== '') matches[matchIndex].home_penalties = parseInt(homePenalties);
+      if (awayPenalties !== null && awayPenalties !== '') matches[matchIndex].away_penalties = parseInt(awayPenalties);
+      if (penaltiesWinner) matches[matchIndex].penalties_winner = penaltiesWinner;
       if (status) matches[matchIndex].status = status;
       if (homeTeam) {
         matches[matchIndex].home_team = homeTeam;
@@ -367,7 +370,7 @@ export const api = {
       // Fetch fresh updated user details for local state
       const users = JSON.parse(localStorage.getItem("demo_users"));
       const currentUser = this.getCurrentUser();
-      const updatedCurrentUser = users.find(u => u.id === currentUser.id);
+      const updatedCurrentUser = users.find(u => u.id === currentUser?.id);
       if (updatedCurrentUser) {
         localStorage.setItem("user", JSON.stringify(updatedCurrentUser));
       }
@@ -378,6 +381,9 @@ export const api = {
     const body = { status };
     if (homeScore !== null && homeScore !== '') body.home_score = parseInt(homeScore);
     if (awayScore !== null && awayScore !== '') body.away_score = parseInt(awayScore);
+    if (homePenalties !== null && homePenalties !== '') body.home_penalties = parseInt(homePenalties);
+    if (awayPenalties !== null && awayPenalties !== '') body.away_penalties = parseInt(awayPenalties);
+    if (penaltiesWinner) body.penalties_winner = penaltiesWinner;
     if (homeTeam) body.home_team = homeTeam;
     if (awayTeam) body.away_team = awayTeam;
 
@@ -691,6 +697,55 @@ export const api = {
 
     const response = await fetch(`${API_BASE_URL}/api/groups/${groupId}/leaderboard`, { headers: getHeaders() });
     if (!response.ok) throw new Error("Error al obtener la tabla de posiciones del grupo");
+    return await response.json();
+  },
+
+  async updateUserProfile(userData) {
+    if (this.getMode() === "demo") {
+      const user = this.getCurrentUser();
+      if (!user) throw new Error("No autenticado");
+      
+      const users = JSON.parse(localStorage.getItem("demo_users") || "[]");
+      const idx = users.findIndex(u => u.id === user.id);
+      if (idx !== -1) {
+        if (userData.display_name) users[idx].display_name = userData.display_name;
+        if (userData.avatar_url) users[idx].avatar_url = userData.avatar_url;
+        localStorage.setItem("demo_users", JSON.stringify(users));
+        
+        const updatedUser = { ...user, ...userData };
+        localStorage.setItem("user", JSON.stringify(updatedUser));
+        return updatedUser;
+      }
+      throw new Error("Usuario demo no encontrado");
+    }
+
+    const response = await fetch(`${API_BASE_URL}/api/users/me`, {
+      method: "PUT",
+      headers: getHeaders(),
+      body: JSON.stringify(userData),
+    });
+    if (!response.ok) {
+      const err = await response.json().catch(() => ({}));
+      throw new Error(err.detail || "Error al actualizar perfil");
+    }
+    const data = await response.json();
+    localStorage.setItem("user", JSON.stringify(data));
+    return data;
+  },
+
+  async getOtherUserPredictions(userId) {
+    if (this.getMode() === "demo") {
+      const allPreds = JSON.parse(localStorage.getItem("demo_predictions") || "[]");
+      const matches = JSON.parse(localStorage.getItem("demo_matches") || "[]");
+      const userPreds = allPreds.filter(p => p.user_id === userId);
+      return userPreds.map(p => {
+        const match = matches.find(m => m.id === p.match_id);
+        return { ...p, match };
+      }).filter(p => p.match && p.match.status !== 'scheduled');
+    }
+
+    const response = await fetch(`${API_BASE_URL}/api/users/${userId}/predictions`, { headers: getHeaders() });
+    if (!response.ok) throw new Error("Error al obtener predicciones del usuario");
     return await response.json();
   }
 };

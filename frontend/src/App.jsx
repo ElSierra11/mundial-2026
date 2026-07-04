@@ -213,8 +213,8 @@ export default function App() {
     }
   };
 
-  const handleUpdateMatchScore = async (matchId, homeScore, awayScore, status, homeTeam = null, awayTeam = null) => {
-    await api.adminUpdateMatchScore(matchId, homeScore, awayScore, status, homeTeam, awayTeam);
+  const handleUpdateMatchScore = async (matchId, homeScore, awayScore, status, homeTeam = null, awayTeam = null, homePenalties = null, awayPenalties = null, penaltiesWinner = null) => {
+    await api.adminUpdateMatchScore(matchId, homeScore, awayScore, status, homeTeam, awayTeam, homePenalties, awayPenalties, penaltiesWinner);
     // Reload all data to recalculate scores and update user stats
     await loadAppData();
     // Refresh header score by loading the updated user profile
@@ -420,7 +420,15 @@ export default function App() {
 
             {/* Profile Tab */}
             {activeTab === 'profile' && (
-              <ProfileView user={user} predictions={predictions} matches={mergedMatches} />
+              <ProfileView 
+                user={user} 
+                predictions={predictions} 
+                matches={mergedMatches}
+                onUpdateProfile={async (data) => {
+                  const updated = await api.updateUserProfile(data);
+                  setUser(updated);
+                }}
+              />
             )}
 
             {/* Admin Panel Tab */}

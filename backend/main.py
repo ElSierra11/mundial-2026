@@ -10,6 +10,7 @@ from database import SessionLocal, engine, get_db
 from fastapi import FastAPI, Depends, HTTPException, status
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
+from sqlalchemy import text
 from datetime import datetime, timedelta
 from typing import List
 
@@ -348,6 +349,57 @@ def get_current_user_profile(
         raise HTTPException(status_code=404, detail="Usuario no encontrado")
     return db_user
 
+@app.put("/api/users/me", response_model=schemas.UserResponse)
+def update_current_user_profile(
+    user_update: schemas.UserUpdate,
+    current_user: schemas.TokenData = Depends(auth.get_current_user_token),
+    db: Session = Depends(get_db)
+):
+    db_user = crud.get_user(db, current_user.id)
+    if not db_user:
+        raise HTTPException(status_code=404, detail="Usuario no encontrado")
+        
+    if user_update.display_name is not None:
+        db_user.display_name = user_update.display_name.strip()
+    if user_update.avatar_url is not None:
+        db_user.avatar_url = user_update.avatar_url.strip()
+    if user_update.password is not None and user_update.password.strip() != "":
+        db_user.password_hash = auth.get_password_hash(user_update.password)
+        
+    db.commit()
+    db.refresh(db_user)
+    
+    # Update avatar and display name in messages if user has posted messages
+    db.query(models.Message).filter(models.Message.user_id == db_user.id).update({
+        models.Message.user_name: db_user.display_name,
+        models.Message.user_avatar: db_user.avatar_url
+    })
+    db.commit()
+    
+    return db_user
+
+@app.get("/api/users/{user_id}/predictions", response_model=List[schemas.PredictionResponse])
+def read_other_user_predictions(
+    user_id: str,
+    current_user: schemas.TokenData = Depends(auth.get_current_user_token),
+    db: Session = Depends(get_db)
+):
+    db_user = crud.get_user(db, user_id)
+    if not db_user:
+        raise HTTPException(status_code=404, detail="Usuario no encontrado")
+        
+    predictions = crud.get_predictions_by_user(db, user_id)
+    
+    # Filter predictions: only show predictions for matches that are live, finished or already started
+    visible_predictions = []
+    now = datetime.utcnow()
+    for pred in predictions:
+        match = pred.match
+        if match and (match.status in ("live", "finished") or match.match_time <= now):
+            visible_predictions.append(pred)
+            
+    return visible_predictions
+
 @app.get("/api/users/leaderboard", response_model=List[schemas.UserLeaderboard])
 def get_leaderboard(db: Session = Depends(get_db)):
     return crud.get_users_leaderboard(db)
@@ -470,7 +522,10 @@ def update_match_score(
         score_update.away_score, 
         score_update.status,
         score_update.home_team,
-        score_update.away_team
+        score_update.away_team,
+        score_update.home_penalties,
+        score_update.away_penalties,
+        score_update.penalties_winner
     )
     
     if not updated_match:
@@ -498,9 +553,13 @@ def reset_database(
     db: Session = Depends(get_db)
 ):
     try:
-        # Clear predictions and matches tables
-        db.query(models.Prediction).delete()
-        db.query(models.Match).delete()
+        # Clear predictions and matches tables, resetting the auto-increment
+        # ID counter too. This is required for the bracket auto-advance logic
+        # in crud.py, which assumes fixed IDs: Ronda de 32=1-16, Octavos=17-24,
+        # Cuartos=25-28, Semifinal=29-30, 3er Puesto=31, Final=32.
+        # (Using .delete() alone leaves the Postgres sequence advanced, which
+        # desincroniza los IDs esperados por la llave del torneo.)
+        db.execute(text("TRUNCATE TABLE predictions, matches RESTART IDENTITY CASCADE"))
         db.commit()
         
         flag_url = "https://flagcdn.com/w160"

@@ -1,7 +1,61 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Award, Flame, Zap, User, Star, Percent, ShieldCheck, HelpCircle, History, Trophy, CheckCircle2, XCircle, Clock } from 'lucide-react';
 
-export default function ProfileView({ user, predictions, matches }) {
+export default function ProfileView({ user, predictions, matches, onUpdateProfile }) {
+  const [isEditing, setIsEditing] = useState(false);
+  const [displayName, setDisplayName] = useState(user?.display_name || '');
+  const [password, setPassword] = useState('');
+  
+  // Extract seed from dicebear url if possible, otherwise fallback to display name
+  const getInitialSeed = () => {
+    if (user?.avatar_url && user.avatar_url.includes('seed=')) {
+      return user.avatar_url.split('seed=')[1];
+    }
+    return user?.display_name || 'guest';
+  };
+  
+  const [avatarSeed, setAvatarSeed] = useState(getInitialSeed());
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState('');
+  const [success, setSuccess] = useState('');
+
+  const handleSaveProfile = async (e) => {
+    e.preventDefault();
+    if (!displayName.trim()) {
+      setError('El nombre de pantalla no puede estar vacío');
+      return;
+    }
+
+    setSaving(true);
+    setError('');
+    setSuccess('');
+
+    const seed = avatarSeed.trim() || displayName.trim();
+    const avatarUrl = `https://api.dicebear.com/7.x/adventurer/svg?seed=${encodeURIComponent(seed)}`;
+
+    const data = {
+      display_name: displayName.trim(),
+      avatar_url: avatarUrl
+    };
+
+    if (password.trim() !== '') {
+      data.password = password.trim();
+    }
+
+    try {
+      await onUpdateProfile(data);
+      setSuccess('¡Perfil actualizado con éxito! ✨');
+      setPassword('');
+      setTimeout(() => {
+        setIsEditing(false);
+        setSuccess('');
+      }, 1500);
+    } catch (err) {
+      setError(err.message || 'Error al guardar los cambios');
+    } finally {
+      setSaving(false);
+    }
+  };
   // Filter predictions that have scores computed (points_earned !== null)
   const gradedPreds = predictions.filter(p => p.points_earned !== null);
   const totalGraded = gradedPreds.length;
@@ -116,9 +170,19 @@ export default function ProfileView({ user, predictions, matches }) {
           className="w-24 h-24 rounded-full border-2 border-brand-gold bg-slate-950 p-1 shadow-lg shadow-brand-gold/10"
         />
 
-        <div className="text-center md:text-left flex-1 space-y-1">
-          <h2 className="text-3xl font-extrabold text-white tracking-tight">{user?.display_name}</h2>
-          <p className="text-xs text-slate-400 font-semibold">{user?.email}</p>
+        <div className="text-center md:text-left flex-1 space-y-1 w-full">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 w-full">
+            <div>
+              <h2 className="text-3xl font-extrabold text-white tracking-tight">{user?.display_name}</h2>
+              <p className="text-xs text-slate-400 font-semibold">{user?.email}</p>
+            </div>
+            <button
+              onClick={() => setIsEditing(!isEditing)}
+              className="py-1.5 px-4 rounded-xl bg-slate-900 hover:bg-slate-850 border border-slate-800 text-xs font-bold text-slate-300 transition-all self-center sm:self-auto shrink-0 shadow-md"
+            >
+              {isEditing ? 'Cancelar Edición' : 'Editar Perfil'}
+            </button>
+          </div>
           <div className="pt-2 flex flex-wrap justify-center md:justify-start gap-2">
             <span className="py-1 px-3 bg-brand-gold/10 border border-brand-gold/20 text-brand-gold rounded-full text-xs font-bold">
               {user?.points || 0} Puntos Totales
@@ -131,6 +195,84 @@ export default function ProfileView({ user, predictions, matches }) {
           </div>
         </div>
       </div>
+
+      {/* Profile Edit Card */}
+      {isEditing && (
+        <form onSubmit={handleSaveProfile} className="glass rounded-3xl p-6 border border-brand-gold/20 space-y-4 animate-[fadeIn_0.2s_ease-out]">
+          <h3 className="text-xs font-bold text-brand-gold uppercase tracking-wider flex items-center gap-1.5">
+            <span>Modificar Datos Personales</span>
+          </h3>
+          
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5">Nombre o apodo</label>
+              <input
+                type="text"
+                value={displayName}
+                onChange={e => setDisplayName(e.target.value)}
+                placeholder="Ingresa tu nuevo nombre"
+                className="w-full bg-[#0a0d14] text-slate-150 placeholder:text-slate-650 rounded-xl px-4 py-2.5 text-xs border border-slate-850/80 focus:border-brand-gold/60 focus:ring-1 focus:ring-brand-gold/25 outline-none transition-all"
+                required
+              />
+            </div>
+
+            <div>
+              <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5">Avatar (Semilla de dibujo)</label>
+              <div className="flex gap-2">
+                <input
+                  type="text"
+                  value={avatarSeed}
+                  onChange={e => setAvatarSeed(e.target.value)}
+                  placeholder="Ej: messi, ronaldo..."
+                  className="flex-1 bg-[#0a0d14] text-slate-150 placeholder:text-slate-650 rounded-xl px-4 py-2.5 text-xs border border-slate-850/80 focus:border-brand-gold/60 focus:ring-1 focus:ring-brand-gold/25 outline-none transition-all"
+                />
+                <button
+                  type="button"
+                  onClick={() => setAvatarSeed(Math.random().toString(36).substring(7))}
+                  className="py-1.5 px-3 rounded-xl bg-slate-900 border border-slate-800 text-[10px] font-bold text-brand-gold hover:bg-slate-850 transition-colors"
+                >
+                  Aleatorio
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5">Nueva contraseña (deja vacío para no cambiarla)</label>
+            <input
+              type="password"
+              value={password}
+              onChange={e => setPassword(e.target.value)}
+              placeholder="Nueva contraseña"
+              className="w-full bg-[#0a0d14] text-slate-150 placeholder:text-slate-650 rounded-xl px-4 py-2.5 text-xs border border-slate-850/80 focus:border-brand-gold/60 focus:ring-1 focus:ring-brand-gold/25 outline-none transition-all"
+            />
+          </div>
+
+          {error && <p className="text-xs text-red-400 font-bold">{error}</p>}
+          {success && <p className="text-xs text-brand-accent font-bold animate-pulse">{success}</p>}
+
+          <div className="flex gap-2 justify-end pt-2">
+            <button
+              type="button"
+              onClick={() => {
+                setIsEditing(false);
+                setError('');
+                setSuccess('');
+              }}
+              className="py-2 px-4 rounded-xl bg-slate-950 hover:bg-slate-900 border border-slate-850 text-xs font-bold text-slate-400"
+            >
+              Cancelar
+            </button>
+            <button
+              type="submit"
+              disabled={saving}
+              className="py-2 px-5 rounded-xl bg-brand-gold text-brand-dark hover:bg-amber-400 text-xs font-bold transition-all shadow-md shadow-brand-gold/10"
+            >
+              {saving ? 'Guardando...' : 'Guardar Cambios'}
+            </button>
+          </div>
+        </form>
+      )}
 
       {/* Grid Stats */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">

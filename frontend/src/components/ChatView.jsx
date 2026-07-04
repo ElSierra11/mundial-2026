@@ -2,6 +2,14 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Send, MessageSquare, Shield, HelpCircle } from 'lucide-react';
 import { api } from '../utils/api';
 
+const parseISO = (str) => {
+  if (!str) return new Date();
+  if (!str.includes('Z') && !str.includes('+') && !str.match(/-\d{2}:\d{2}$/)) {
+    return new Date(str + 'Z');
+  }
+  return new Date(str);
+};
+
 export default function ChatView({ user, isDemo }) {
   const [messages, setMessages] = useState([]);
   const [inputText, setInputText] = useState('');
@@ -160,10 +168,18 @@ export default function ChatView({ user, isDemo }) {
 
   const formatTime = (isoString) => {
     try {
-      const date = new Date(isoString);
-      // Show date if message is from a different day
-      const today = new Date();
-      const isToday = date.toDateString() === today.toDateString();
+      const date = parseISO(isoString);
+      
+      const getBogotaDateString = (d) => {
+        return d.toLocaleDateString('es-CO', {
+          timeZone: 'America/Bogota',
+          year: 'numeric',
+          month: 'numeric',
+          day: 'numeric'
+        });
+      };
+      
+      const isToday = getBogotaDateString(date) === getBogotaDateString(new Date());
       if (isToday) {
         return date.toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit', timeZone: 'America/Bogota' });
       }

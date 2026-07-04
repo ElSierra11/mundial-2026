@@ -20,6 +20,7 @@ class UserResponse(UserBase):
         from_attributes = True
 
 class UserLeaderboard(BaseModel):
+    id: str
     display_name: Optional[str]
     avatar_url: Optional[str]
     points: int
@@ -43,6 +44,9 @@ class MatchCreate(MatchBase):
 class MatchUpdate(BaseModel):
     home_score: Optional[int] = None
     away_score: Optional[int] = None
+    home_penalties: Optional[int] = None
+    away_penalties: Optional[int] = None
+    penalties_winner: Optional[str] = None
     status: Optional[str] = None  # 'scheduled', 'live', 'finished'
     home_team: Optional[str] = None
     away_team: Optional[str] = None
@@ -51,7 +55,15 @@ class MatchResponse(MatchBase):
     id: int
     home_score: Optional[int] = None
     away_score: Optional[int] = None
+    home_penalties: Optional[int] = None
+    away_penalties: Optional[int] = None
+    penalties_winner: Optional[str] = None
     status: str
+
+class UserUpdate(BaseModel):
+    display_name: Optional[str] = None
+    avatar_url: Optional[str] = None
+    password: Optional[str] = None
 
     class Config:
         from_attributes = True

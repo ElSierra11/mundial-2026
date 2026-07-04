@@ -2,7 +2,7 @@ import React, { useState, useMemo } from 'react';
 import { Clock, Lock, Radio, Trophy, MapPin, Sparkles, Check } from 'lucide-react';
 
 // ─── Team Row ──────────────────────────────────────────────────────────────────
-function TeamRow({ name, flag, score, winner, tbd, isSimulating, isSimWinner, onClick }) {
+function TeamRow({ name, flag, score, penScore, winner, tbd, isSimulating, isSimWinner, onClick }) {
   const isClickable = isSimulating && !tbd;
 
   return (
@@ -33,8 +33,11 @@ function TeamRow({ name, flag, score, winner, tbd, isSimulating, isSimWinner, on
       {isSimWinner && <Check className="w-3.5 h-3.5 text-brand-gold flex-shrink-0" />}
 
       {!isSimulating && !tbd && score !== null && score !== undefined && (
-        <span className={`text-sm font-black tabular-nums min-w-[16px] text-right ${winner ? 'text-brand-accent' : 'text-slate-500'}`}>
-          {score}
+        <span className={`text-sm font-black tabular-nums min-w-[16px] text-right ${winner ? 'text-brand-accent' : 'text-slate-500'} flex items-center gap-0.5`}>
+          <span>{score}</span>
+          {penScore !== null && penScore !== undefined && (
+            <span className="text-[9px] font-bold text-slate-400">({penScore})</span>
+          )}
         </span>
       )}
     </div>
@@ -56,8 +59,8 @@ function BracketCard({ match, pred, isSimulating, simWinner, onSelectWinner }) {
   const isDone    = match.status === 'finished';
   const homeTBD   = !match.home_team || match.home_team === 'TBD';
   const awayTBD   = !match.away_team || match.away_team === 'TBD';
-  const homeWins  = isDone && match.home_score > match.away_score;
-  const awayWins  = isDone && match.away_score > match.home_score;
+  const homeWins  = isDone && (match.home_score > match.away_score || (match.home_score === match.away_score && match.penalties_winner === match.home_team));
+  const awayWins  = isDone && (match.away_score > match.home_score || (match.home_score === match.away_score && match.penalties_winner === match.away_team));
 
   return (
     <div className={`w-44 h-28 flex flex-col justify-between rounded-xl border overflow-hidden shadow-lg transition-all
@@ -89,6 +92,7 @@ function BracketCard({ match, pred, isSimulating, simWinner, onSelectWinner }) {
           name={match.home_team}
           flag={match.home_flag_url}
           score={match.home_score}
+          penScore={match.home_penalties}
           winner={homeWins}
           tbd={homeTBD}
           isSimulating={isSimulating}
@@ -100,6 +104,7 @@ function BracketCard({ match, pred, isSimulating, simWinner, onSelectWinner }) {
           name={match.away_team}
           flag={match.away_flag_url}
           score={match.away_score}
+          penScore={match.away_penalties}
           winner={awayWins}
           tbd={awayTBD}
           isSimulating={isSimulating}
@@ -248,9 +253,15 @@ export default function BracketView({ matches, predictions, lastSync }) {
       const m = matchMap[mid];
       if (!m) return null;
       if (m.status === 'finished') {
-        return m.home_score > m.away_score 
-          ? { name: m.home_team, flag: m.home_flag_url } 
-          : { name: m.away_team, flag: m.away_flag_url };
+        if (m.home_score > m.away_score) {
+          return { name: m.home_team, flag: m.home_flag_url };
+        } else if (m.away_score > m.home_score) {
+          return { name: m.away_team, flag: m.away_flag_url };
+        } else if (m.penalties_winner) {
+          return m.penalties_winner === m.home_team 
+            ? { name: m.home_team, flag: m.home_flag_url } 
+            : { name: m.away_team, flag: m.away_flag_url };
+        }
       }
       if (isSimulating) {
         const choice = simWinners[mid];
@@ -268,9 +279,15 @@ export default function BracketView({ matches, predictions, lastSync }) {
       const m = matchMap[mid];
       if (!m) return null;
       if (m.status === 'finished') {
-        return m.home_score > m.away_score 
-          ? { name: m.away_team, flag: m.away_flag_url } 
-          : { name: m.home_team, flag: m.home_flag_url };
+        if (m.home_score > m.away_score) {
+          return { name: m.away_team, flag: m.away_flag_url };
+        } else if (m.away_score > m.home_score) {
+          return { name: m.home_team, flag: m.home_flag_url };
+        } else if (m.penalties_winner) {
+          return m.penalties_winner === m.home_team 
+            ? { name: m.away_team, flag: m.away_flag_url } 
+            : { name: m.home_team, flag: m.home_flag_url };
+        }
       }
       if (isSimulating) {
         const choice = simWinners[mid];

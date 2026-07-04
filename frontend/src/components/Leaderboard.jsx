@@ -21,6 +21,32 @@ export default function Leaderboard({ users, currentUser, matches = [], predicti
   const [feedback, setFeedback] = useState('');
   const [copiedId, setCopiedId] = useState(null);
 
+  // Expanded User Predictions states
+  const [expandedUserId, setExpandedUserId] = useState(null);
+  const [expandedUserPredictions, setExpandedUserPredictions] = useState([]);
+  const [loadingPredictions, setLoadingPredictions] = useState(false);
+
+  const handleToggleExpand = async (userId) => {
+    if (!userId) return;
+    if (expandedUserId === userId) {
+      setExpandedUserId(null);
+      setExpandedUserPredictions([]);
+      return;
+    }
+
+    setExpandedUserId(userId);
+    setExpandedUserPredictions([]);
+    setLoadingPredictions(true);
+    try {
+      const preds = await api.getOtherUserPredictions(userId);
+      setExpandedUserPredictions(preds);
+    } catch (err) {
+      console.error("Error loading predictions:", err);
+    } finally {
+      setLoadingPredictions(false);
+    }
+  };
+
   // SVG Chart state
   const [showChart, setShowChart] = useState(false);
 
@@ -379,43 +405,97 @@ export default function Leaderboard({ users, currentUser, matches = [], predicti
 
                 {users.map((item, index) => {
                   const isMe = currentUser && (currentUser.display_name === item.display_name || currentUser.email === item.email);
+                  const isExpanded = expandedUserId === item.id;
                   return (
-                    <div
-                      key={index}
-                      className={`grid grid-cols-12 px-6 py-3.5 items-center transition-all ${
-                        isMe ? 'bg-brand-accent/5 border-l-2 border-brand-accent' : 'hover:bg-slate-900/20'
-                      }`}
-                    >
-                      <div className="col-span-2 flex justify-center">
-                        {getRankBadge(item.rank)}
-                      </div>
+                    <React.Fragment key={index}>
+                      <div
+                        onClick={() => handleToggleExpand(item.id)}
+                        className={`grid grid-cols-12 px-6 py-3.5 items-center transition-all cursor-pointer ${
+                          isMe ? 'bg-brand-accent/5 border-l-2 border-brand-accent' : 'hover:bg-slate-900/20'
+                        } ${isExpanded ? 'bg-slate-900/40 border-b border-slate-850' : ''}`}
+                      >
+                        <div className="col-span-2 flex justify-center">
+                          {getRankBadge(item.rank)}
+                        </div>
 
-                      <div className="col-span-7 flex items-center gap-3 pl-2">
-                        <img
-                          src={item.avatar_url || 'https://api.dicebear.com/7.x/adventurer/svg?seed=guest'}
-                          alt={item.display_name}
-                          className={`w-9 h-9 rounded-full border bg-slate-950 ${isMe ? 'border-brand-accent/40' : 'border-slate-800'}`}
-                        />
-                        <div>
-                          <span className={`text-sm font-semibold block ${isMe ? 'text-brand-accent' : 'text-slate-200'}`}>
-                            {item.display_name}
-                          </span>
-                          {isMe && (
-                            <span className="inline-flex items-center gap-0.5 text-[9px] text-brand-accent/80 font-bold uppercase leading-none mt-0.5">
-                              <Sparkles className="w-2.5 h-2.5 fill-brand-accent/15" />
-                              <span>Tú</span>
+                        <div className="col-span-7 flex items-center gap-3 pl-2">
+                          <img
+                            src={item.avatar_url || 'https://api.dicebear.com/7.x/adventurer/svg?seed=guest'}
+                            alt={item.display_name}
+                            className={`w-9 h-9 rounded-full border bg-slate-950 ${isMe ? 'border-brand-accent/40' : 'border-slate-800'}`}
+                          />
+                          <div>
+                            <span className={`text-sm font-semibold block ${isMe ? 'text-brand-accent' : 'text-slate-200'} flex items-center gap-1.5`}>
+                              <span>{item.display_name}</span>
+                              <span className="text-[8px] text-slate-550 lowercase tracking-tight normal-case font-normal">(ver predicciones)</span>
                             </span>
-                          )}
+                            {isMe && (
+                              <span className="inline-flex items-center gap-0.5 text-[9px] text-brand-accent/80 font-bold uppercase leading-none mt-0.5">
+                                <Sparkles className="w-2.5 h-2.5 fill-brand-accent/15" />
+                                <span>Tú</span>
+                              </span>
+                            )}
+                          </div>
+                        </div>
+
+                        <div className="col-span-3 text-right">
+                          <span className={`text-base font-black ${item.rank === 1 ? 'text-brand-gold' : (isMe ? 'text-brand-accent' : 'text-slate-100')}`}>
+                            {item.points}
+                          </span>
+                          <span className="text-[10px] text-slate-500 font-semibold ml-1">Pts</span>
                         </div>
                       </div>
 
-                      <div className="col-span-3 text-right">
-                        <span className={`text-base font-black ${item.rank === 1 ? 'text-brand-gold' : (isMe ? 'text-brand-accent' : 'text-slate-100')}`}>
-                          {item.points}
-                        </span>
-                        <span className="text-[10px] text-slate-500 font-semibold ml-1">Pts</span>
-                      </div>
-                    </div>
+                      {/* Expanded Sub-Panel */}
+                      {isExpanded && (
+                        <div className="col-span-12 px-6 py-4 bg-slate-950/65 border-b border-slate-900/50 space-y-2.5 animate-[slideInRight_0.2s_ease-out]">
+                          <div className="flex justify-between items-center text-[9px] font-black uppercase tracking-wider text-slate-500">
+                            <span>Pronósticos de {item.display_name}</span>
+                            <span>Solo partidos iniciados/cerrados</span>
+                          </div>
+                          
+                          {loadingPredictions ? (
+                            <div className="flex items-center justify-center py-5">
+                              <div className="w-5 h-5 border-2 border-brand-gold border-t-transparent rounded-full animate-spin"></div>
+                            </div>
+                          ) : expandedUserPredictions.length === 0 ? (
+                            <p className="text-[10px] text-slate-600 italic py-2 text-center">Este usuario no tiene predicciones para partidos iniciados o finalizados.</p>
+                          ) : (
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                              {expandedUserPredictions.map(p => {
+                                const match = p.match;
+                                if (!match) return null;
+                                const pts = p.points_earned;
+                                let statusBadge = null;
+                                if (pts === 3) {
+                                  statusBadge = <span className="text-brand-gold font-bold text-[9px] bg-brand-gold/10 px-1.5 py-0.5 rounded border border-brand-gold/20">+3 Exacto 🎯</span>;
+                                } else if (pts === 1) {
+                                  statusBadge = <span className="text-brand-accent font-bold text-[9px] bg-brand-accent/15 px-1.5 py-0.5 rounded border border-brand-accent/25">+1 Acertado ✓</span>;
+                                } else if (pts === 0) {
+                                  statusBadge = <span className="text-slate-500 font-bold text-[9px] bg-slate-900 px-1.5 py-0.5 rounded border border-slate-850">+0 Pts</span>;
+                                } else {
+                                  statusBadge = <span className="text-indigo-400 font-bold text-[9px] bg-indigo-950/40 px-1.5 py-0.5 rounded border border-indigo-900/30">En Juego 🕒</span>;
+                                }
+
+                                return (
+                                  <div key={p.id || p.match_id} className="flex items-center justify-between p-2 rounded-xl bg-slate-900/50 border border-slate-850/80 text-[10px]">
+                                    <div className="flex items-center gap-1.5 truncate flex-1 pr-2">
+                                      <img src={match.home_flag_url} alt="" className="w-4.5 h-3 object-cover rounded-sm border border-slate-950/60" />
+                                      <span className="font-semibold text-slate-350 truncate">{match.home_team} vs {match.away_team}</span>
+                                      <img src={match.away_flag_url} alt="" className="w-4.5 h-3 object-cover rounded-sm border border-slate-950/60" />
+                                    </div>
+                                    <div className="flex items-center gap-2 shrink-0">
+                                      <span className="text-xs font-bold text-white bg-slate-950 py-0.5 px-2 rounded-md border border-slate-850/70">{p.home_prediction} - {p.away_prediction}</span>
+                                      {statusBadge}
+                                    </div>
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </React.Fragment>
                   );
                 })}
               </div>
@@ -492,38 +572,92 @@ export default function Leaderboard({ users, currentUser, matches = [], predicti
 
                     {groupUsers.map((item, index) => {
                       const isMe = currentUser && (currentUser.display_name === item.display_name || currentUser.email === item.email);
+                      const isExpanded = expandedUserId === item.id;
                       return (
-                        <div
-                          key={index}
-                          className={`grid grid-cols-12 px-6 py-3.5 items-center transition-all ${
-                            isMe ? 'bg-brand-accent/5 border-l-2 border-brand-accent' : 'hover:bg-slate-900/20'
-                          }`}
-                        >
-                          <div className="col-span-2 flex justify-center">
-                            {getRankBadge(item.rank)}
-                          </div>
+                        <React.Fragment key={index}>
+                          <div
+                            onClick={() => handleToggleExpand(item.id)}
+                            className={`grid grid-cols-12 px-6 py-3.5 items-center transition-all cursor-pointer ${
+                              isMe ? 'bg-brand-accent/5 border-l-2 border-brand-accent' : 'hover:bg-slate-900/20'
+                            } ${isExpanded ? 'bg-slate-900/40 border-b border-slate-850' : ''}`}
+                          >
+                            <div className="col-span-2 flex justify-center">
+                              {getRankBadge(item.rank)}
+                            </div>
 
-                          <div className="col-span-7 flex items-center gap-3 pl-2">
-                            <img
-                              src={item.avatar_url || 'https://api.dicebear.com/7.x/adventurer/svg?seed=guest'}
-                              alt={item.display_name}
-                              className={`w-9 h-9 rounded-full border bg-slate-950 ${isMe ? 'border-brand-accent/40' : 'border-slate-800'}`}
-                            />
-                            <div>
-                              <span className={`text-sm font-semibold block ${isMe ? 'text-brand-accent' : 'text-slate-200'}`}>
-                                {item.display_name}
+                            <div className="col-span-7 flex items-center gap-3 pl-2">
+                              <img
+                                src={item.avatar_url || 'https://api.dicebear.com/7.x/adventurer/svg?seed=guest'}
+                                alt={item.display_name}
+                                className={`w-9 h-9 rounded-full border bg-slate-950 ${isMe ? 'border-brand-accent/40' : 'border-slate-800'}`}
+                              />
+                              <div>
+                                <span className={`text-sm font-semibold block ${isMe ? 'text-brand-accent' : 'text-slate-200'} flex items-center gap-1.5`}>
+                                  <span>{item.display_name}</span>
+                                  <span className="text-[8px] text-slate-550 lowercase tracking-tight normal-case font-normal">(ver predicciones)</span>
+                                </span>
+                                {isMe && <span className="text-[9px] text-brand-accent/80 font-bold uppercase tracking-wider block">Tú</span>}
+                              </div>
+                            </div>
+
+                            <div className="col-span-3 text-right">
+                              <span className={`text-base font-black ${item.rank === 1 ? 'text-brand-gold' : (isMe ? 'text-brand-accent' : 'text-slate-100')}`}>
+                                {item.points}
                               </span>
-                              {isMe && <span className="text-[9px] text-brand-accent/80 font-bold uppercase tracking-wider block">Tú</span>}
+                              <span className="text-[10px] text-slate-500 font-semibold ml-1">Pts</span>
                             </div>
                           </div>
 
-                          <div className="col-span-3 text-right">
-                            <span className={`text-base font-black ${item.rank === 1 ? 'text-brand-gold' : (isMe ? 'text-brand-accent' : 'text-slate-100')}`}>
-                              {item.points}
-                            </span>
-                            <span className="text-[10px] text-slate-500 font-semibold ml-1">Pts</span>
-                          </div>
-                        </div>
+                          {/* Expanded Sub-Panel (Private League) */}
+                          {isExpanded && (
+                            <div className="col-span-12 px-6 py-4 bg-slate-950/65 border-b border-slate-900/50 space-y-2.5 animate-[slideInRight_0.2s_ease-out]">
+                              <div className="flex justify-between items-center text-[9px] font-black uppercase tracking-wider text-slate-500">
+                                <span>Pronósticos de {item.display_name}</span>
+                                <span>Solo partidos iniciados/cerrados</span>
+                              </div>
+                              
+                              {loadingPredictions ? (
+                                <div className="flex items-center justify-center py-5">
+                                  <div className="w-5 h-5 border-2 border-brand-gold border-t-transparent rounded-full animate-spin"></div>
+                                </div>
+                              ) : expandedUserPredictions.length === 0 ? (
+                                <p className="text-[10px] text-slate-650 italic py-2 text-center">Este usuario no tiene predicciones para partidos iniciados o finalizados.</p>
+                              ) : (
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                                  {expandedUserPredictions.map(p => {
+                                    const match = p.match;
+                                    if (!match) return null;
+                                    const pts = p.points_earned;
+                                    let statusBadge = null;
+                                    if (pts === 3) {
+                                      statusBadge = <span className="text-brand-gold font-bold text-[9px] bg-brand-gold/10 px-1.5 py-0.5 rounded border border-brand-gold/20">+3 Exacto 🎯</span>;
+                                    } else if (pts === 1) {
+                                      statusBadge = <span className="text-brand-accent font-bold text-[9px] bg-brand-accent/15 px-1.5 py-0.5 rounded border border-brand-accent/25">+1 Acertado ✓</span>;
+                                    } else if (pts === 0) {
+                                      statusBadge = <span className="text-slate-500 font-bold text-[9px] bg-slate-900 px-1.5 py-0.5 rounded border border-slate-850">+0 Pts</span>;
+                                    } else {
+                                      statusBadge = <span className="text-indigo-400 font-bold text-[9px] bg-indigo-950/40 px-1.5 py-0.5 rounded border border-indigo-900/30">En Juego 🕒</span>;
+                                    }
+
+                                    return (
+                                      <div key={p.id || p.match_id} className="flex items-center justify-between p-2 rounded-xl bg-slate-900/50 border border-slate-855/80 text-[10px]">
+                                        <div className="flex items-center gap-1.5 truncate flex-1 pr-2">
+                                          <img src={match.home_flag_url} alt="" className="w-4.5 h-3 object-cover rounded-sm border border-slate-950/60" />
+                                          <span className="font-semibold text-slate-350 truncate">{match.home_team} vs {match.away_team}</span>
+                                          <img src={match.away_flag_url} alt="" className="w-4.5 h-3 object-cover rounded-sm border border-slate-950/60" />
+                                        </div>
+                                        <div className="flex items-center gap-2 shrink-0">
+                                          <span className="text-xs font-bold text-white bg-slate-950 py-0.5 px-2 rounded-md border border-slate-850/70">{p.home_prediction} - {p.away_prediction}</span>
+                                          {statusBadge}
+                                        </div>
+                                      </div>
+                                    );
+                                  })}
+                                </div>
+                              )}
+                            </div>
+                          )}
+                        </React.Fragment>
                       );
                     })}
                   </div>
