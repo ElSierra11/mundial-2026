@@ -41,9 +41,22 @@ def run_migrations():
         try:
             with engine.begin() as trans_conn:
                 trans_conn.execute(text("ALTER TABLE users ADD COLUMN favorite_team VARCHAR"))
-            print("[MIGRATION] Users table updated successfully!")
+            print("[MIGRATION] Users table updated successfully with favorite_team!")
         except Exception as e:
-            print(f"[MIGRATION ERROR] Failed to run users migration: {e}")
+            print(f"[MIGRATION ERROR] Failed to run users favorite_team migration: {e}")
+
+    try:
+        with engine.connect() as conn:
+            conn.execute(text("SELECT champion_vote FROM users LIMIT 1"))
+    except Exception:
+        print("[MIGRATION] Column champion_vote does not exist. Altering users table...")
+        try:
+            with engine.begin() as trans_conn:
+                trans_conn.execute(text("ALTER TABLE users ADD COLUMN champion_vote VARCHAR"))
+            print("[MIGRATION] Users table updated successfully with champion_vote!")
+        except Exception as e:
+            print(f"[MIGRATION ERROR] Failed to run users champion_vote migration: {e}")
+
 
     # Self-healing loop: Make sure all finished matches are advanced in the bracket
     try:
