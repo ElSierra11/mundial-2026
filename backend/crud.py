@@ -454,3 +454,28 @@ def get_group_leaderboard(db: Session, group_id: int):
     return ranked_members
 
 
+def get_all_users(db: Session):
+    return db.query(models.User).order_by(models.User.points.desc()).all()
+
+
+def delete_user(db: Session, user_id: str):
+    db_user = db.query(models.User).filter(models.User.id == user_id).first()
+    if db_user:
+        # Delete predictions
+        db.query(models.Prediction).filter(models.Prediction.user_id == user_id).delete()
+        # Delete group memberships
+        db.query(models.GroupMember).filter(models.GroupMember.user_id == user_id).delete()
+        # Delete groups owned by this user
+        owned_groups = db.query(models.Group).filter(models.Group.owner_id == user_id).all()
+        for g in owned_groups:
+            db.query(models.GroupMember).filter(models.GroupMember.group_id == g.id).delete()
+            db.delete(g)
+        # Delete chat messages
+        db.query(models.Message).filter(models.Message.user_id == user_id).delete()
+        # Delete user
+        db.delete(db_user)
+        db.commit()
+        return True
+    return False
+
+

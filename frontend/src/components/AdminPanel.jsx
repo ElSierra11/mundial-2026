@@ -1,5 +1,6 @@
-import React, { useState } from 'react';
-import { Shield, RefreshCw, Check, AlertTriangle, Save, RotateCcw } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { Shield, RefreshCw, Check, AlertTriangle, Save, RotateCcw, Users, Trash2 } from 'lucide-react';
+import { api } from '../utils/api';
 
 
 export default function AdminPanel({ matches, onUpdateScore, onRecalculate, onResetDatabase }) {
@@ -8,6 +9,43 @@ export default function AdminPanel({ matches, onUpdateScore, onRecalculate, onRe
   const [recalculating, setRecalculating] = useState(false);
   const [resetting, setResetting] = useState(false);
   const [feedback, setFeedback] = useState('');
+
+  const [usersList, setUsersList] = useState([]);
+  const [loadingUsers, setLoadingUsers] = useState(false);
+  const [deletingUserId, setDeletingUserId] = useState(null);
+
+  const fetchUsers = async () => {
+    setLoadingUsers(true);
+    try {
+      const data = await api.adminGetUsers();
+      setUsersList(data);
+    } catch (err) {
+      console.error("Error fetching users:", err);
+    } finally {
+      setLoadingUsers(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchUsers();
+  }, []);
+
+  const handleDeleteUser = async (userId, displayName) => {
+    if (!window.confirm(`¿Estás seguro de que deseas eliminar permanentemente al usuario "${displayName}"? Se borrarán todos sus pronósticos y participación.`)) {
+      return;
+    }
+    setDeletingUserId(userId);
+    try {
+      await api.adminDeleteUser(userId);
+      setUsersList(usersList.filter(u => u.id !== userId));
+      setFeedback(`Usuario "${displayName}" eliminado correctamente.`);
+      setTimeout(() => setFeedback(''), 4000);
+    } catch (err) {
+      alert("Error al eliminar usuario: " + err.message);
+    } finally {
+      setDeletingUserId(null);
+    }
+  };
 
   const handleInputChange = (matchId, field, value) => {
     // If not in editingScores yet, populate it with current match values
@@ -315,8 +353,88 @@ export default function AdminPanel({ matches, onUpdateScore, onRecalculate, onRe
         </div>
       </div>
 
+      {/* 👥 Sección de Gestión de Usuarios */}
+      <div className="glass rounded-3xl border border-slate-800 overflow-hidden shadow-xl mt-6">
+        <div className="px-6 py-4 bg-slate-950/40 border-b border-slate-900/50 flex items-center justify-between">
+          <h3 className="text-sm font-bold text-slate-300 uppercase tracking-wider flex items-center gap-2">
+            <Users className="w-4.5 h-4.5 text-brand-purple" />
+            <span>Usuarios Registrados ({usersList.length})</span>
+          </h3>
+          <button
+            onClick={fetchUsers}
+            disabled={loadingUsers}
+            className="p-1.5 rounded-lg hover:bg-slate-900 border border-slate-850 text-slate-400 hover:text-white transition-colors"
+            title="Refrescar usuarios"
+          >
+            <RefreshCw className={`w-3.5 h-3.5 ${loadingUsers ? 'animate-spin' : ''}`} />
+          </button>
+        </div>
+
+        <div className="p-4">
+          {loadingUsers && usersList.length === 0 ? (
+            <div className="py-8 text-center text-slate-500 flex flex-col items-center gap-2">
+              <div className="w-6 h-6 border-2 border-brand-purple border-t-transparent rounded-full animate-spin"></div>
+              <span className="text-xs font-semibold">Cargando listado de usuarios...</span>
+            </div>
+          ) : usersList.length === 0 ? (
+            <div className="py-8 text-center text-slate-500 text-xs">
+              No hay usuarios registrados.
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              {usersList.map((usr) => {
+                const isSelf = api.getCurrentUser()?.id === usr.id;
+                return (
+                  <div
+                    key={usr.id}
+                    className="flex items-center justify-between p-3.5 rounded-2xl bg-slate-900/40 border border-slate-850 hover:border-slate-800 transition-all"
+                  >
+                    <div className="flex items-center gap-3 min-w-0">
+                      <img
+                        src={usr.avatar_url || 'https://api.dicebear.com/7.x/adventurer/svg?seed=guest'}
+                        alt={usr.display_name}
+                        className="w-9 h-9 rounded-full border border-slate-700 bg-slate-950"
+                      />
+                      <div className="min-w-0">
+                        <span className="text-xs font-bold text-slate-200 block truncate flex items-center gap-1.5">
+                          <span>{usr.display_name || usr.email.split('@')[0]}</span>
+                          {usr.is_admin && (
+                            <span className="text-[8px] bg-brand-purple/15 border border-brand-purple/35 text-brand-purple font-extrabold px-1 rounded uppercase tracking-wider">
+                              Admin
+                            </span>
+                          )}
+                        </span>
+                        <span className="text-[10px] text-slate-500 block truncate">{usr.email}</span>
+                        <span className="text-[10px] text-brand-gold font-bold">{usr.points || 0} Pts</span>
+                      </div>
+                    </div>
+
+                    <button
+                      onClick={() => handleDeleteUser(usr.id, usr.display_name)}
+                      disabled={isSelf || deletingUserId === usr.id}
+                      className={`p-2 rounded-xl border border-slate-850 transition-all ${
+                        isSelf
+                          ? 'opacity-40 cursor-not-allowed text-slate-650'
+                          : 'hover:border-red-500/30 hover:bg-red-500/10 text-slate-450 hover:text-red-400'
+                      }`}
+                      title={isSelf ? 'No puedes eliminarte a ti mismo' : 'Eliminar usuario'}
+                    >
+                      {deletingUserId === usr.id ? (
+                        <div className="w-4 h-4 border-2 border-red-400 border-t-transparent rounded-full animate-spin"></div>
+                      ) : (
+                        <Trash2 className="w-4.5 h-4.5" />
+                      )}
+                    </button>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      </div>
+
       {/* DB Warning note */}
-      <div className="p-4 bg-yellow-950/40 border border-yellow-500/20 text-yellow-500 rounded-2xl flex gap-3 text-xs leading-relaxed">
+      <div className="p-4 bg-yellow-950/40 border border-yellow-500/20 text-yellow-500 rounded-2xl flex gap-3 text-xs leading-relaxed mt-4">
         <AlertTriangle className="w-5 h-5 shrink-0" />
         <div>
           <span className="font-bold block mb-0.5">Nota sobre la puntuación</span>

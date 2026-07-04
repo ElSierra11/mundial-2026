@@ -939,6 +939,34 @@ def reset_database(
         raise HTTPException(status_code=500, detail=f"Error al reiniciar la base de datos: {str(e)}")
 
 
+@app.get("/api/admin/users", response_model=list[schemas.UserResponse])
+def admin_get_all_users(
+    admin: schemas.TokenData = Depends(auth.get_admin_user_token),
+    db: Session = Depends(get_db)
+):
+    return crud.get_all_users(db)
+
+
+@app.delete("/api/admin/users/{user_id}")
+def admin_delete_user(
+    user_id: str,
+    admin: schemas.TokenData = Depends(auth.get_admin_user_token),
+    db: Session = Depends(get_db)
+):
+    if admin.id == user_id:
+        raise HTTPException(
+            status_code=400,
+            detail="No puedes eliminarte a ti mismo."
+        )
+    success = crud.delete_user(db, user_id)
+    if not success:
+        raise HTTPException(
+            status_code=404,
+            detail="Usuario no encontrado."
+        )
+    return {"message": "Usuario eliminado exitosamente."}
+
+
 # --- PREMIUM FEATURES ENDPOINTS ---
 
 @app.get("/api/matches/{match_id}/stats", response_model=schemas.MatchStatsResponse)

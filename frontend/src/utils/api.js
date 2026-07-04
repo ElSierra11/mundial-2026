@@ -505,6 +505,33 @@ export const api = {
     await this.refreshLocalUserProfile();
   },
 
+  async adminGetUsers() {
+    if (this.getMode() === "demo") {
+      return JSON.parse(localStorage.getItem("demo_users") || "[]");
+    }
+    const response = await fetch(`${API_BASE_URL}/api/admin/users`, { headers: getHeaders() });
+    if (!response.ok) throw new Error("Error al obtener los usuarios registrados");
+    return await response.json();
+  },
+
+  async adminDeleteUser(userId) {
+    if (this.getMode() === "demo") {
+      const users = JSON.parse(localStorage.getItem("demo_users") || "[]");
+      const filtered = users.filter(u => u.id !== userId);
+      localStorage.setItem("demo_users", JSON.stringify(filtered));
+      return { message: "Usuario eliminado en modo demo" };
+    }
+    const response = await fetch(`${API_BASE_URL}/api/admin/users/${userId}`, {
+      method: "DELETE",
+      headers: getHeaders(),
+    });
+    if (!response.ok) {
+      const err = await response.json().catch(() => ({}));
+      throw new Error(err.detail || "Error al eliminar el usuario");
+    }
+    return await response.json();
+  },
+
   // Private helper to calculate points in Demo Mode
   _demoRecalculateScores() {
     const matches = JSON.parse(localStorage.getItem("demo_matches"));
