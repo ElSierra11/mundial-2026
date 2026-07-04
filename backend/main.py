@@ -696,6 +696,94 @@ def trigger_recalculate_all(
     return {"message": "Puntajes de todos los usuarios actualizados correctamente."}
 
 
+@app.post("/api/admin/test-email-reminders")
+def test_email_reminders(
+    hours_ahead: int = 24,
+    dry_run: bool = True,
+    admin: schemas.TokenData = Depends(auth.get_admin_user_token),
+    db: Session = Depends(get_db)
+):
+    """
+    Prueba el sistema de recordatorios de correo.
+    - hours_ahead: ventana de tiempo hacia adelante (default 24h para pruebas)
+    - dry_run: si True, solo simula sin enviar correos reales (ignora SENT_REMINDERS)
+    Retorna un reporte detallado de los correos que se enviarían/enviaron.
+    """
+    now = datetime.utcnow()
+    upcoming = db.query(models.Match).filter(
+        models.Match.status == "scheduled",
+        models.Match.match_time > now,
+        models.Match.match_time <= now + timedelta(hours=hours_ahead)
+    ).all()
+
+    users = db.query(models.User).all()
+    report = {
+        "checked_at_utc": now.isoformat(),
+        "window_hours": hours_ahead,
+        "dry_run": dry_run,
+        "matches_found": len(upcoming),
+        "reminders_sent": [],
+        "reminders_skipped": [],
+    }
+
+    for match in upcoming:
+        match_desc = f"{match.home_team} vs {match.away_team}"
+        cot_time = match.match_time - timedelta(hours=5)
+        kickoff_str = cot_time.strftime("%I:%M %p")
+        match_info = {
+            "match_id": match.id,
+            "match": match_desc,
+            "kickoff_cot": kickoff_str,
+            "stage": match.stage,
+        }
+
+        for user in users:
+            key = (user.id, match.id)
+            already_sent = key in SENT_REMINDERS
+
+            pred = db.query(models.Prediction).filter_by(user_id=user.id, match_id=match.id).first()
+            has_prediction = pred is not None
+
+            if has_prediction:
+                report["reminders_skipped"].append({
+                    **match_info,
+                    "user": user.display_name or user.email,
+                    "reason": "Ya tiene predicción guardada"
+                })
+                continue
+
+            if already_sent and not dry_run:
+                report["reminders_skipped"].append({
+                    **match_info,
+                    "user": user.display_name or user.email,
+                    "reason": "Recordatorio ya enviado anteriormente"
+                })
+                continue
+
+            # Send or simulate
+            entry = {
+                **match_info,
+                "user": user.display_name or user.email,
+                "email": user.email,
+            }
+
+            if dry_run:
+                entry["status"] = "simulado (dry_run=True)"
+            else:
+                success = send_reminder_email(user.email, user.display_name or "Usuario", match_desc, kickoff_str)
+                SENT_REMINDERS.add(key)
+                entry["status"] = "enviado" if success else "error al enviar"
+
+            report["reminders_sent"].append(entry)
+
+    report["summary"] = (
+        f"{len(report['reminders_sent'])} recordatorios {'simulados' if dry_run else 'enviados'}, "
+        f"{len(report['reminders_skipped'])} omitidos "
+        f"({len(upcoming)} partidos en las próximas {hours_ahead}h)"
+    )
+    return report
+
+
 @app.post("/api/admin/reset_db")
 def reset_database(
     admin: schemas.TokenData = Depends(auth.get_admin_user_token),

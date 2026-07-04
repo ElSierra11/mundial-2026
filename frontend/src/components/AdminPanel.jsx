@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Shield, RefreshCw, Check, AlertTriangle, Save, RotateCcw, Users, Trash2 } from 'lucide-react';
+import { Shield, RefreshCw, Check, AlertTriangle, Save, RotateCcw, Users, Trash2, Mail, ChevronDown, ChevronUp, Send } from 'lucide-react';
 import { api } from '../utils/api';
 
 
@@ -13,6 +13,13 @@ export default function AdminPanel({ matches, onUpdateScore, onRecalculate, onRe
   const [usersList, setUsersList] = useState([]);
   const [loadingUsers, setLoadingUsers] = useState(false);
   const [deletingUserId, setDeletingUserId] = useState(null);
+
+  // Email reminder test state
+  const [emailTestLoading, setEmailTestLoading] = useState(false);
+  const [emailTestReport, setEmailTestReport] = useState(null);
+  const [showEmailReport, setShowEmailReport] = useState(false);
+  const [emailDryRun, setEmailDryRun] = useState(true);
+  const [emailHours, setEmailHours] = useState(24);
 
   const fetchUsers = async () => {
     setLoadingUsers(true);
@@ -146,6 +153,28 @@ export default function AdminPanel({ matches, onUpdateScore, onRecalculate, onRe
     }
   };
 
+  const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+
+  const handleTestEmails = async () => {
+    setEmailTestLoading(true);
+    setEmailTestReport(null);
+    try {
+      const token = localStorage.getItem('token');
+      const res = await fetch(
+        `${API_BASE}/api/admin/test-email-reminders?hours_ahead=${emailHours}&dry_run=${emailDryRun}`,
+        { method: 'POST', headers: { Authorization: `Bearer ${token}` } }
+      );
+      if (!res.ok) throw new Error('Error al llamar al endpoint');
+      const data = await res.json();
+      setEmailTestReport(data);
+      setShowEmailReport(true);
+    } catch (err) {
+      alert('Error al probar correos: ' + err.message);
+    } finally {
+      setEmailTestLoading(false);
+    }
+  };
+
   return (
     <div className="w-full max-w-4xl mx-auto space-y-6">
       {/* Header Banner */}
@@ -181,6 +210,15 @@ export default function AdminPanel({ matches, onUpdateScore, onRecalculate, onRe
             <RotateCcw className={`w-4 h-4 text-red-500 ${resetting ? 'animate-spin' : ''}`} />
             <span>{resetting ? 'Reiniciando...' : 'Reiniciar Mundial 2026'}</span>
           </button>
+
+          <button
+            onClick={handleTestEmails}
+            disabled={emailTestLoading}
+            className="flex items-center gap-2 py-2.5 px-4 rounded-xl bg-emerald-950/20 border border-emerald-900/30 hover:border-emerald-500 hover:bg-emerald-950/40 text-xs font-bold text-emerald-400 transition-all shadow-md flex-1 lg:flex-none justify-center"
+          >
+            <Mail className={`w-4 h-4 text-emerald-500 ${emailTestLoading ? 'animate-bounce' : ''}`} />
+            <span>{emailTestLoading ? 'Probando...' : 'Probar Correos'}</span>
+          </button>
         </div>
       </div>
 
@@ -190,6 +228,106 @@ export default function AdminPanel({ matches, onUpdateScore, onRecalculate, onRe
           <span>{feedback}</span>
         </div>
       )}
+
+      {/* Email Test Config & Report */}
+      <div className="glass rounded-3xl border border-slate-800 overflow-hidden">
+        <button
+          onClick={() => setShowEmailReport(v => !v)}
+          className="w-full flex items-center justify-between px-6 py-4 text-xs font-bold text-slate-400 hover:text-slate-200 transition-colors uppercase tracking-wider bg-slate-950/30"
+        >
+          <span className="flex items-center gap-2">
+            <Mail className="w-4 h-4 text-emerald-400" />
+            Sistema de Recordatorios por Correo
+          </span>
+          {showEmailReport ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+        </button>
+
+        {showEmailReport && (
+          <div className="px-6 pb-6 space-y-4">
+            {/* Config Row */}
+            <div className="flex flex-wrap items-center gap-4 pt-4">
+              <div className="flex items-center gap-2">
+                <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wide">Ventana (horas):</label>
+                <input
+                  type="number" min="1" max="168"
+                  value={emailHours}
+                  onChange={e => setEmailHours(parseInt(e.target.value) || 24)}
+                  className="w-16 bg-slate-900 border border-slate-800 rounded-lg px-2 py-1 text-xs text-white text-center focus:border-brand-gold/50 outline-none"
+                />
+              </div>
+              <label className="flex items-center gap-2 cursor-pointer">
+                <div
+                  onClick={() => setEmailDryRun(v => !v)}
+                  className={`w-10 h-5 rounded-full transition-all relative ${
+                    emailDryRun ? 'bg-slate-700' : 'bg-emerald-600'
+                  }`}
+                >
+                  <div className={`absolute top-0.5 w-4 h-4 rounded-full bg-white shadow transition-all ${
+                    emailDryRun ? 'left-0.5' : 'left-5'
+                  }`} />
+                </div>
+                <span className="text-[10px] font-bold uppercase tracking-wide">
+                  {emailDryRun
+                    ? <span className="text-slate-400">Simulación (sin enviar)</span>
+                    : <span className="text-emerald-400">Envío Real activado</span>
+                  }
+                </span>
+              </label>
+              <button
+                onClick={handleTestEmails}
+                disabled={emailTestLoading}
+                className="flex items-center gap-1.5 py-1.5 px-4 rounded-xl bg-emerald-900/30 border border-emerald-700/40 hover:bg-emerald-900/50 text-xs font-bold text-emerald-300 transition-all"
+              >
+                <Send className="w-3.5 h-3.5" />
+                {emailTestLoading ? 'Ejecutando...' : 'Ejecutar prueba'}
+              </button>
+            </div>
+
+            {/* Report Results */}
+            {emailTestReport && (
+              <div className="space-y-3">
+                <div className="p-3 rounded-xl bg-emerald-950/30 border border-emerald-900/40 text-[10px] font-bold text-emerald-300">
+                  {emailTestReport.summary}
+                </div>
+
+                {emailTestReport.reminders_sent.length > 0 && (
+                  <div className="space-y-1.5">
+                    <p className="text-[9px] font-black uppercase tracking-widest text-emerald-500">✉️ Recordatorios enviados/simulados ({emailTestReport.reminders_sent.length})</p>
+                    <div className="max-h-48 overflow-y-auto space-y-1 pr-1">
+                      {emailTestReport.reminders_sent.map((r, i) => (
+                        <div key={i} className="flex items-center gap-2 text-[10px] bg-emerald-950/20 border border-emerald-900/30 rounded-lg px-3 py-2">
+                          <Mail className="w-3 h-3 text-emerald-400 shrink-0" />
+                          <span className="text-slate-300 font-semibold flex-1 truncate">{r.user}</span>
+                          <span className="text-slate-500 shrink-0">{r.match}</span>
+                          <span className={`shrink-0 font-bold ${
+                            r.status?.includes('enviado') ? 'text-emerald-400' :
+                            r.status?.includes('simulado') ? 'text-amber-400' : 'text-red-400'
+                          }`}>{r.status}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {emailTestReport.reminders_skipped.length > 0 && (
+                  <div className="space-y-1.5">
+                    <p className="text-[9px] font-black uppercase tracking-widest text-slate-500">⏭️ Omitidos ({emailTestReport.reminders_skipped.length})</p>
+                    <div className="max-h-36 overflow-y-auto space-y-1 pr-1">
+                      {emailTestReport.reminders_skipped.map((r, i) => (
+                        <div key={i} className="flex items-center gap-2 text-[10px] bg-slate-950/40 border border-slate-900/50 rounded-lg px-3 py-1.5">
+                          <span className="text-slate-500 flex-1 truncate">{r.user}</span>
+                          <span className="text-slate-600 shrink-0 truncate max-w-[150px]">{r.match}</span>
+                          <span className="text-slate-600 shrink-0 text-[9px] italic">{r.reason}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        )}
+      </div>
 
       {/* Matches Score Editor */}
       <div className="glass rounded-3xl border border-slate-800 overflow-hidden shadow-xl">
