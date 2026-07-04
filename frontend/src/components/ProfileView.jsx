@@ -197,7 +197,7 @@ export default function ProfileView({ user, predictions, matches, onUpdateProfil
   return (
     <div className="w-full max-w-4xl mx-auto space-y-6">
       {/* Profile Header */}
-      <div className="glass rounded-3xl p-6 border border-slate-800 relative overflow-hidden flex flex-col md:flex-row items-center gap-6">
+      <div className="glass-pitch-glow border-gold-glow rounded-3xl p-6 relative overflow-hidden flex flex-col md:flex-row items-center gap-6">
         <div className="absolute right-0 top-0 w-48 h-48 bg-brand-gold/5 rounded-full blur-3xl pointer-events-none"></div>
         <div className="absolute left-10 bottom-0 w-32 h-32 bg-brand-purple/5 rounded-full blur-2xl pointer-events-none"></div>
 

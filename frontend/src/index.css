@@ -7,10 +7,10 @@
 @layer base {
   body {
     @apply text-slate-100 font-sans antialiased overflow-x-hidden;
-    background-color: #040906;
+    background-color: #030a05;
     color: #f3f4f6;
-    background-image: radial-gradient(circle at top, #0c2012 0%, #040906 85%), 
-                      url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120' viewBox='0 0 120 120'%3E%3Crect width='120' height='120' fill='none'/%3E%3Cpath d='M0 60 H120 M60 0 V120 M10 10 h100 v100 H10 Z' stroke='rgba(16, 185, 129, 0.02)' stroke-width='0.7' fill='none'/%3E%3Ccircle cx='60' cy='60' r='20' fill='none' stroke='rgba(16, 185, 129, 0.02)' stroke-width='0.7'/%3E%3C/svg%3E");
+    background-image: radial-gradient(circle at top, #062a14 0%, #030a05 85%), 
+                      url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160' viewBox='0 0 160 160'%3E%3Crect width='160' height='160' fill='none'/%3E%3Cpath d='M0 80 H160 M80 0 V160 M15 15 h130 v130 H15 Z' stroke='rgba(16, 185, 129, 0.08)' stroke-width='0.8' fill='none'/%3E%3Ccircle cx='80' cy='80' r='25' fill='none' stroke='rgba(16, 185, 129, 0.08)' stroke-width='0.8'/%3E%3C/svg%3E");
     background-attachment: fixed;
     min-height: 100vh;
   }

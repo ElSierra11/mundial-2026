@@ -160,8 +160,12 @@ export default function MatchCard({ match, prediction, onSavePrediction }) {
     }
   }
 
+  const cardBorderClass = match.status === 'live'
+    ? 'border-green-glow'
+    : (match.status === 'finished' && points === 3 ? 'border-gold-glow' : 'border-slate-800/85');
+
   return (
-    <div className={`glass glass-card-hover rounded-2xl p-5 relative border border-slate-800 ${
+    <div className={`glass-pitch-glow glass-card-hover rounded-2xl p-5 relative border ${cardBorderClass} ${
       isLocked ? 'opacity-95' : ''
     }`}>
       {/* Top Header Card */}
