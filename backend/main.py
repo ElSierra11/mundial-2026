@@ -708,7 +708,12 @@ def reset_database(
         # Cuartos=25-28, Semifinal=29-30, 3er Puesto=31, Final=32.
         # (Using .delete() alone leaves the Postgres sequence advanced, which
         # desincroniza los IDs esperados por la llave del torneo.)
-        db.execute(text("TRUNCATE TABLE predictions, matches RESTART IDENTITY CASCADE"))
+        if db.bind.dialect.name == "sqlite":
+            db.execute(text("DELETE FROM predictions"))
+            db.execute(text("DELETE FROM matches"))
+            db.execute(text("DELETE FROM sqlite_sequence WHERE name IN ('predictions', 'matches')"))
+        else:
+            db.execute(text("TRUNCATE TABLE predictions, matches RESTART IDENTITY CASCADE"))
         db.commit()
         
         flag_url = "https://flagcdn.com/w160"

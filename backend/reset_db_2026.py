@@ -11,7 +11,12 @@ try:
     # which is required for the bracket auto-advance logic in crud.py
     # (it assumes fixed IDs: Ronda de 32=1-16, Octavos=17-24, Cuartos=25-28,
     # Semifinal=29-30, 3er Puesto=31, Final=32).
-    db.execute(text("TRUNCATE TABLE predictions, matches RESTART IDENTITY CASCADE"))
+    if db.bind.dialect.name == "sqlite":
+        db.execute(text("DELETE FROM predictions"))
+        db.execute(text("DELETE FROM matches"))
+        db.execute(text("DELETE FROM sqlite_sequence WHERE name IN ('predictions', 'matches')"))
+    else:
+        db.execute(text("TRUNCATE TABLE predictions, matches RESTART IDENTITY CASCADE"))
     db.commit()
 
     print("Seeding database with the official FIFA World Cup 2026 matches...")
