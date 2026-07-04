@@ -13,6 +13,7 @@ class User(Base):
     is_admin = Column(Boolean, default=False)
     password_hash = Column(String, nullable=True)
     favorite_team = Column(String, nullable=True)
+    champion_vote = Column(String, nullable=True)  # Team the user thinks will win the World Cup
 
     predictions = relationship("Prediction", back_populates="user", cascade="all, delete-orphan")
 

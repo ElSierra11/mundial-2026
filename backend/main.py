@@ -1192,3 +1192,85 @@ def get_group_board(
         
     return crud.get_group_leaderboard(db, group_id)
 
+
+# ─── Champion Poll Endpoints ───────────────────────────────────────────────────
+
+@app.get("/api/champion-votes")
+def get_champion_votes(
+    current_user: schemas.TokenData = Depends(auth.get_current_user_token),
+    db: Session = Depends(get_db)
+):
+    """
+    Returns the champion poll results: votes aggregated by team,
+    plus the current user's vote and a list of voters per team.
+    """
+    # Auto-migrate: add column if DB doesn't have it yet
+    try:
+        db.execute(text("SELECT champion_vote FROM users LIMIT 1"))
+    except Exception:
+        try:
+            db.execute(text("ALTER TABLE users ADD COLUMN champion_vote VARCHAR"))
+            db.commit()
+        except Exception:
+            pass
+
+    users = db.query(models.User).all()
+    total_votes = sum(1 for u in users if u.champion_vote)
+
+    # Aggregate votes per team
+    tally = {}
+    for u in users:
+        if not u.champion_vote:
+            continue
+        team = u.champion_vote
+        if team not in tally:
+            tally[team] = {"team": team, "votes": 0, "voters": []}
+        tally[team]["votes"] += 1
+        tally[team]["voters"].append({
+            "display_name": u.display_name or "Usuario",
+            "avatar_url": u.avatar_url,
+        })
+
+    results = sorted(tally.values(), key=lambda x: -x["votes"])
+
+    # Add percentage
+    for r in results:
+        r["pct"] = round((r["votes"] / total_votes) * 100) if total_votes > 0 else 0
+
+    # Find current user's vote
+    my_vote = None
+    for u in users:
+        if u.id == current_user.id:
+            my_vote = u.champion_vote
+            break
+
+    return {
+        "total_votes": total_votes,
+        "my_vote": my_vote,
+        "results": results,
+    }
+
+
+@app.post("/api/champion-vote")
+def cast_champion_vote(
+    payload: dict,
+    current_user: schemas.TokenData = Depends(auth.get_current_user_token),
+    db: Session = Depends(get_db)
+):
+    """
+    Cast or update the current user's champion vote.
+    Body: { "team": "Argentina" }
+    """
+    team = payload.get("team", "").strip()
+    if not team:
+        raise HTTPException(status_code=400, detail="Debes especificar un equipo.")
+
+    db_user = crud.get_user(db, current_user.id)
+    if not db_user:
+        raise HTTPException(status_code=404, detail="Usuario no encontrado.")
+
+    db_user.champion_vote = team
+    db.commit()
+    db.refresh(db_user)
+
+    return {"message": f"Voto registrado: {team}", "team": team}

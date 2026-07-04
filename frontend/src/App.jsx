@@ -8,6 +8,7 @@ import BracketView from './components/BracketView';
 import GroupsView from './components/GroupsView';
 import ChatView from './components/ChatView';
 import ProfileView from './components/ProfileView';
+import ChampionPoll from './components/ChampionPoll';
 import { api } from './utils/api';
 import { fetchLiveWorldCupScores, mergeLiveData } from './utils/liveApi';
 import { Sparkles, Radio, Database, AlertCircle, Calendar, Wifi, WifiOff, CheckCircle2, XCircle, Info } from 'lucide-react';
@@ -363,40 +364,47 @@ export default function App() {
 
             {/* Bracket Tab */}
             {activeTab === 'bracket' && (
-              <div className="glass rounded-3xl p-6 border border-slate-800 shadow-2xl relative overflow-hidden">
-                <div className="absolute right-0 top-0 w-64 h-64 bg-brand-accent/5 rounded-full blur-3xl pointer-events-none"></div>
-                <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-8 z-10 relative">
-                  <div>
-                    <h2 className="text-2xl font-extrabold tracking-tight flex items-center gap-2">
-                      <span>Llave del Torneo</span>
-                      <span className="text-xs py-0.5 px-2 bg-brand-accent/15 border border-brand-accent/30 text-brand-accent rounded-full font-bold uppercase tracking-wide">Octavos + Eliminatorias</span>
-                    </h2>
-                    <p className="text-slate-400 text-xs mt-1">Sigue el avance de los partidos reales y mira tus predicciones en tiempo real</p>
-                  </div>
-                  {lastSync && (
-                    <div className="flex items-center gap-2 text-xs py-1.5 px-3 bg-slate-950/60 border border-slate-900 rounded-xl text-slate-400">
-                      {liveConnected ? (
-                        <>
-                          <span className="w-2.5 h-2.5 bg-emerald-500 rounded-full animate-pulse"></span>
-                          <span>ESPN en Vivo Conectado · {lastSync}</span>
-                        </>
-                      ) : (
-                        <>
-                          <span className="w-2.5 h-2.5 bg-slate-600 rounded-full"></span>
-                          <span>ESPN Sincronizado · {lastSync}</span>
-                        </>
-                      )}
-                    </div>
-                  )}
-                </div>
+              <div className="space-y-6">
+                {/* Champion Poll Widget */}
+                <ChampionPoll />
 
-                <BracketView 
-                  matches={mergedMatches} 
-                  predictions={predictions} 
-                  lastSync={lastSync}
-                />
+                {/* Bracket Card */}
+                <div className="glass rounded-3xl p-6 border border-slate-800 shadow-2xl relative overflow-hidden">
+                  <div className="absolute right-0 top-0 w-64 h-64 bg-brand-accent/5 rounded-full blur-3xl pointer-events-none"></div>
+                  <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-8 z-10 relative">
+                    <div>
+                      <h2 className="text-2xl font-extrabold tracking-tight flex items-center gap-2">
+                        <span>Llave del Torneo</span>
+                        <span className="text-xs py-0.5 px-2 bg-brand-accent/15 border border-brand-accent/30 text-brand-accent rounded-full font-bold uppercase tracking-wide">Octavos + Eliminatorias</span>
+                      </h2>
+                      <p className="text-slate-400 text-xs mt-1">Sigue el avance de los partidos reales y mira tus predicciones en tiempo real</p>
+                    </div>
+                    {lastSync && (
+                      <div className="flex items-center gap-2 text-xs py-1.5 px-3 bg-slate-950/60 border border-slate-900 rounded-xl text-slate-400">
+                        {liveConnected ? (
+                          <>
+                            <span className="w-2.5 h-2.5 bg-emerald-500 rounded-full animate-pulse"></span>
+                            <span>ESPN en Vivo Conectado · {lastSync}</span>
+                          </>
+                        ) : (
+                          <>
+                            <span className="w-2.5 h-2.5 bg-slate-600 rounded-full"></span>
+                            <span>ESPN Sincronizado · {lastSync}</span>
+                          </>
+                        )}
+                      </div>
+                    )}
+                  </div>
+
+                  <BracketView 
+                    matches={mergedMatches} 
+                    predictions={predictions} 
+                    lastSync={lastSync}
+                  />
+                </div>
               </div>
             )}
+
 
             {/* Leaderboard Tab */}
             {activeTab === 'leaderboard' && (

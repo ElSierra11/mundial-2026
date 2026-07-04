@@ -1,7 +1,8 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Save, Lock, AlertCircle, CheckCircle2, Trophy, Share2, BarChart2, Users, ChevronDown, ChevronUp, Activity, Target, Flag, Minus } from 'lucide-react';
 import { api } from '../utils/api';
 import { fetchESPNMatchStats } from '../utils/liveApi';
+import { triggerConfetti } from '../utils/confetti';
 
 const parseISO = (str) => {
   if (!str) return new Date();
@@ -45,6 +46,20 @@ export default function MatchCard({ match, prediction, onSavePrediction }) {
   const [espnStats, setEspnStats] = useState(null);
   const [showEspnStats, setShowEspnStats] = useState(false);
   const [loadingEspn, setLoadingEspn] = useState(false);
+
+  // 🎉 Confetti — fire once when user gets 3 pts on this match
+  const confettiFired = useRef(false);
+  useEffect(() => {
+    if (
+      match.status === 'finished' &&
+      prediction?.points_earned === 3 &&
+      !confettiFired.current
+    ) {
+      confettiFired.current = true;
+      // Small delay so the card renders first
+      setTimeout(() => triggerConfetti(), 400);
+    }
+  }, [match.status, prediction?.points_earned]);
 
   useEffect(() => {
     const fetchStats = async () => {
