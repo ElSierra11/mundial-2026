@@ -1,6 +1,31 @@
 import React, { useState } from 'react';
 import { Award, Flame, Zap, User, Star, Percent, ShieldCheck, HelpCircle, History, Trophy, CheckCircle2, XCircle, Clock } from 'lucide-react';
 
+const COPA_TEAMS = [
+  "Alemania", "Argelia", "Argentina", "Australia", "Austria", "Bélgica", "Bosnia y Herz.", "Brasil", 
+  "Cabo Verde", "Canadá", "Colombia", "Costa de Marfil", "Croacia", "Ecuador", "EE. UU.", "Egipto", 
+  "España", "Francia", "Ghana", "Inglaterra", "Japón", "Marruecos", "México", "Noruega", "Países Bajos", 
+  "Paraguay", "Portugal", "R. D. Congo", "Senegal", "Suecia", "Suiza", "Sudáfrica"
+].sort();
+
+const TEAM_FLAGS = {
+  "Alemania": "de", "Argelia": "dz", "Argentina": "ar", "Australia": "au", "Austria": "at", 
+  "Bélgica": "be", "Bosnia y Herz.": "ba", "Brasil": "br", "Cabo Verde": "cv", "Canadá": "ca", 
+  "Colombia": "co", "Costa de Marfil": "ci", "Croacia": "hr", "Ecuador": "ec", "EE. UU.": "us", 
+  "Egipto": "eg", "España": "es", "Francia": "fr", "Ghana": "gh", "Inglaterra": "gb", 
+  "Japón": "jp", "Marruecos": "ma", "México": "mx", "Noruega": "no", "Países Bajos": "nl", 
+  "Paraguay": "py", "Portugal": "pt", "R. D. Congo": "cd", "Senegal": "sn", "Suecia": "se", 
+  "Suiza": "ch", "Sudáfrica": "za"
+};
+
+const getTeamFlag = (teamName) => {
+  if (!teamName) return null;
+  const code = TEAM_FLAGS[teamName];
+  if (!code) return null;
+  return `https://flagcdn.com/w160/${code}.png`;
+};
+
+
 export default function ProfileView({ user, predictions, matches, onUpdateProfile }) {
   const [isEditing, setIsEditing] = useState(false);
   const [displayName, setDisplayName] = useState(user?.display_name || '');
@@ -15,6 +40,7 @@ export default function ProfileView({ user, predictions, matches, onUpdateProfil
   };
   
   const [avatarSeed, setAvatarSeed] = useState(getInitialSeed());
+  const [favoriteTeam, setFavoriteTeam] = useState(user?.favorite_team || '');
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
@@ -35,7 +61,8 @@ export default function ProfileView({ user, predictions, matches, onUpdateProfil
 
     const data = {
       display_name: displayName.trim(),
-      avatar_url: avatarUrl
+      avatar_url: avatarUrl,
+      favorite_team: favoriteTeam
     };
 
     if (password.trim() !== '') {
@@ -75,6 +102,8 @@ export default function ProfileView({ user, predictions, matches, onUpdateProfil
   const exactPct = totalGraded > 0
     ? Math.round((exactCount / totalGraded) * 100)
     : 0;
+
+  const circ = 2 * Math.PI * 38; // ~238.76
 
   // Calculate Streaks
   // First, map predictions to their respective match date to sort chronologically
@@ -154,6 +183,14 @@ export default function ProfileView({ user, predictions, matches, onUpdateProfil
       earned: !!user?.is_admin,
       icon: <ShieldCheck className="w-6 h-6 text-emerald-500" />,
       bg: 'bg-emerald-500/10 border-emerald-500/25'
+    },
+    {
+      id: 'favorite_selected',
+      name: 'Hincha Oficial',
+      desc: 'Seleccionaste tu selección favorita del mundial',
+      earned: !!user?.favorite_team,
+      icon: <Star className="w-6 h-6 text-indigo-400" />,
+      bg: 'bg-indigo-500/10 border-indigo-500/25'
     }
   ];
 
@@ -173,7 +210,17 @@ export default function ProfileView({ user, predictions, matches, onUpdateProfil
         <div className="text-center md:text-left flex-1 space-y-1 w-full">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 w-full">
             <div>
-              <h2 className="text-3xl font-extrabold text-white tracking-tight">{user?.display_name}</h2>
+              <div className="flex items-center justify-center md:justify-start gap-2">
+                <h2 className="text-3xl font-extrabold text-white tracking-tight">{user?.display_name}</h2>
+                {user?.favorite_team && (
+                  <img
+                    src={getTeamFlag(user.favorite_team)}
+                    alt={user.favorite_team}
+                    className="w-7 h-5 object-cover rounded shadow border border-slate-850"
+                    title={`Hincha de ${user.favorite_team}`}
+                  />
+                )}
+              </div>
               <p className="text-xs text-slate-400 font-semibold">{user?.email}</p>
             </div>
             <button
@@ -237,15 +284,31 @@ export default function ProfileView({ user, predictions, matches, onUpdateProfil
             </div>
           </div>
 
-          <div>
-            <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5">Nueva contraseña (deja vacío para no cambiarla)</label>
-            <input
-              type="password"
-              value={password}
-              onChange={e => setPassword(e.target.value)}
-              placeholder="Nueva contraseña"
-              className="w-full bg-[#0a0d14] text-slate-150 placeholder:text-slate-650 rounded-xl px-4 py-2.5 text-xs border border-slate-850/80 focus:border-brand-gold/60 focus:ring-1 focus:ring-brand-gold/25 outline-none transition-all"
-            />
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5">Selección Favorita ⚽</label>
+              <select
+                value={favoriteTeam}
+                onChange={e => setFavoriteTeam(e.target.value)}
+                className="w-full bg-[#0a0d14] text-slate-150 rounded-xl px-4 py-2.5 text-xs border border-slate-850/80 focus:border-brand-gold/60 focus:ring-1 focus:ring-brand-gold/25 outline-none transition-all"
+              >
+                <option value="">Ninguna</option>
+                {COPA_TEAMS.map(team => (
+                  <option key={team} value={team}>{team}</option>
+                ))}
+              </select>
+            </div>
+
+            <div>
+              <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5">Nueva contraseña (deja vacío para no cambiarla)</label>
+              <input
+                type="password"
+                value={password}
+                onChange={e => setPassword(e.target.value)}
+                placeholder="Nueva contraseña"
+                className="w-full bg-[#0a0d14] text-slate-150 placeholder:text-slate-650 rounded-xl px-4 py-2.5 text-xs border border-slate-850/80 focus:border-brand-gold/60 focus:ring-1 focus:ring-brand-gold/25 outline-none transition-all"
+              />
+            </div>
           </div>
 
           {error && <p className="text-xs text-red-400 font-bold">{error}</p>}
@@ -313,37 +376,94 @@ export default function ProfileView({ user, predictions, matches, onUpdateProfil
       {/* Breakdowns */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         {/* Detail Breakdown */}
-        <div className="glass p-6 rounded-3xl border border-slate-800 space-y-4">
-          <h3 className="text-sm font-bold text-slate-300 uppercase tracking-wider">Desglose de Aciertos</h3>
-          
-          <div className="space-y-3">
-            <div>
-              <div className="flex justify-between text-xs font-semibold mb-1">
-                <span className="text-brand-gold">Marcador Exacto (+3 pts)</span>
-                <span className="text-slate-300">{exactCount} de {totalGraded}</span>
-              </div>
-              <div className="w-full bg-slate-950 rounded-full h-2 overflow-hidden border border-slate-850">
-                <div className="bg-brand-gold h-full rounded-full" style={{ width: `${exactPct}%` }}></div>
-              </div>
+        <div className="glass p-6 rounded-3xl border border-slate-800 space-y-4 flex flex-col sm:flex-row items-center gap-6">
+          <div className="relative w-28 h-28 flex-shrink-0 flex items-center justify-center">
+            <svg width="100%" height="100%" viewBox="0 0 100 100" className="transform -rotate-90">
+              <circle cx="50" cy="50" r="38" fill="none" stroke="#0a0d14" strokeWidth="8" />
+              {totalGraded === 0 ? (
+                <circle cx="50" cy="50" r="38" fill="none" stroke="#1e293b" strokeWidth="8" />
+              ) : (
+                <>
+                  <circle
+                    cx="50"
+                    cy="50"
+                    r="38"
+                    fill="none"
+                    stroke="#475569"
+                    strokeWidth="8"
+                    strokeDasharray={`${circ * (wrongCount / totalGraded)} ${circ}`}
+                    strokeDashoffset={circ - circ * (wrongCount / totalGraded) - circ * (outcomeCount / totalGraded) - circ * (exactCount / totalGraded)}
+                  />
+                  <circle
+                    cx="50"
+                    cy="50"
+                    r="38"
+                    fill="none"
+                    stroke="#10b981"
+                    strokeWidth="8"
+                    strokeDasharray={`${circ * (outcomeCount / totalGraded)} ${circ}`}
+                    strokeDashoffset={circ - circ * (outcomeCount / totalGraded) - circ * (exactCount / totalGraded)}
+                  />
+                  <circle
+                    cx="50"
+                    cy="50"
+                    r="38"
+                    fill="none"
+                    stroke="#e5c158"
+                    strokeWidth="8"
+                    strokeDasharray={`${circ * (exactCount / totalGraded)} ${circ}`}
+                    strokeDashoffset={circ - circ * (exactCount / totalGraded)}
+                  />
+                </>
+              )}
+            </svg>
+            <div className="absolute inset-0 flex flex-col items-center justify-center">
+              <span className="text-lg font-black text-white">{accuracy}%</span>
+              <span className="text-[7px] text-slate-500 font-bold uppercase tracking-wider">Aciertos</span>
             </div>
+          </div>
 
-            <div>
-              <div className="flex justify-between text-xs font-semibold mb-1">
-                <span className="text-brand-accent">Resultado / Ganador (+1 pt)</span>
-                <span className="text-slate-300">{outcomeCount} de {totalGraded}</span>
+          <div className="flex-1 w-full space-y-3">
+            <h3 className="text-sm font-bold text-slate-300 uppercase tracking-wider">Desglose de Aciertos</h3>
+            
+            <div className="space-y-2">
+              <div>
+                <div className="flex justify-between text-[11px] font-semibold mb-0.5">
+                  <span className="text-brand-gold flex items-center gap-1.5">
+                    <span className="w-2 h-2 rounded-full bg-brand-gold inline-block"></span>
+                    Marcador Exacto (+3 pts)
+                  </span>
+                  <span className="text-slate-400">{exactCount} ({exactPct}%)</span>
+                </div>
+                <div className="w-full bg-slate-950 rounded-full h-1.5 overflow-hidden border border-slate-900">
+                  <div className="bg-brand-gold h-full rounded-full" style={{ width: `${exactPct}%` }}></div>
+                </div>
               </div>
-              <div className="w-full bg-slate-950 rounded-full h-2 overflow-hidden border border-slate-850">
-                <div className="bg-brand-accent h-full rounded-full" style={{ width: `${totalGraded > 0 ? Math.round((outcomeCount / totalGraded) * 100) : 0}%` }}></div>
-              </div>
-            </div>
 
-            <div>
-              <div className="flex justify-between text-xs font-semibold mb-1">
-                <span className="text-slate-500">Errores / Fallados (+0 pts)</span>
-                <span className="text-slate-400">{wrongCount} de {totalGraded}</span>
+              <div>
+                <div className="flex justify-between text-[11px] font-semibold mb-0.5">
+                  <span className="text-brand-accent flex items-center gap-1.5">
+                    <span className="w-2 h-2 rounded-full bg-brand-accent inline-block"></span>
+                    Ganador / Empate (+1 pt)
+                  </span>
+                  <span className="text-slate-400">{outcomeCount} ({totalGraded > 0 ? Math.round((outcomeCount / totalGraded) * 100) : 0}%)</span>
+                </div>
+                <div className="w-full bg-slate-950 rounded-full h-1.5 overflow-hidden border border-slate-900">
+                  <div className="bg-brand-accent h-full rounded-full" style={{ width: `${totalGraded > 0 ? Math.round((outcomeCount / totalGraded) * 100) : 0}%` }}></div>
+                </div>
               </div>
-              <div className="w-full bg-slate-950 rounded-full h-2 overflow-hidden border border-slate-850">
-                <div className="bg-slate-700 h-full rounded-full" style={{ width: `${totalGraded > 0 ? Math.round((wrongCount / totalGraded) * 100) : 0}%` }}></div>
+
+              <div>
+                <div className="flex justify-between text-[11px] font-semibold mb-0.5">
+                  <span className="text-slate-500 flex items-center gap-1.5">
+                    <span className="w-2 h-2 rounded-full bg-slate-650 inline-block"></span>
+                    Fallados (+0 pts)
+                  </span>
+                  <span className="text-slate-500">{wrongCount} ({totalGraded > 0 ? Math.round((wrongCount / totalGraded) * 100) : 0}%)</span>
+                </div>
+                <div className="w-full bg-slate-950 rounded-full h-1.5 overflow-hidden border border-slate-900">
+                  <div className="bg-slate-700 h-full rounded-full" style={{ width: `${totalGraded > 0 ? Math.round((wrongCount / totalGraded) * 100) : 0}%` }}></div>
+                </div>
               </div>
             </div>
           </div>

@@ -12,6 +12,7 @@ class User(Base):
     points = Column(Integer, default=0)
     is_admin = Column(Boolean, default=False)
     password_hash = Column(String, nullable=True)
+    favorite_team = Column(String, nullable=True)
 
     predictions = relationship("Prediction", back_populates="user", cascade="all, delete-orphan")
 

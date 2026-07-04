@@ -33,6 +33,18 @@ def run_migrations():
         except Exception as e:
             print(f"[MIGRATION ERROR] Failed to run migration: {e}")
 
+    try:
+        with engine.connect() as conn:
+            conn.execute(text("SELECT favorite_team FROM users LIMIT 1"))
+    except Exception:
+        print("[MIGRATION] Column favorite_team does not exist. Altering users table...")
+        try:
+            with engine.begin() as trans_conn:
+                trans_conn.execute(text("ALTER TABLE users ADD COLUMN favorite_team VARCHAR"))
+            print("[MIGRATION] Users table updated successfully!")
+        except Exception as e:
+            print(f"[MIGRATION ERROR] Failed to run users migration: {e}")
+
     # Self-healing loop: Make sure all finished matches are advanced in the bracket
     try:
         db = SessionLocal()
@@ -51,15 +63,109 @@ run_migrations()
 # Create DB tables
 models.Base.metadata.create_all(bind=engine)
 
+import smtplib
+from email.mime.text import MIMEText
+from email.mime.multipart import MIMEMultipart
+
+SENT_REMINDERS = set()  # set of (user_id, match_id) to avoid spamming
+
+def send_reminder_email(to_email: str, display_name: str, match_desc: str, kickoff_str: str):
+    smtp_host = os.environ.get("SMTP_HOST")
+    smtp_port = int(os.environ.get("SMTP_PORT", "587"))
+    smtp_user = os.environ.get("SMTP_USERNAME")
+    smtp_pass = os.environ.get("SMTP_PASSWORD")
+    smtp_from = os.environ.get("SMTP_FROM", smtp_user)
+    
+    subject = f"⚽ ¡No olvides tu pronóstico para el partido {match_desc}!"
+    
+    html = f"""
+    <html>
+      <body style="font-family: sans-serif; background-color: #05070a; color: #f3f4f6; padding: 20px;">
+        <div style="max-width: 500px; margin: 0 auto; background-color: #0c0f16; border: 1px solid #e5c158; border-radius: 16px; padding: 24px; text-align: center;">
+          <h2 style="color: #e5c158; margin-bottom: 8px;">🏆 Resultados Mundialistas</h2>
+          <p style="font-size: 15px; color: #f3f4f6;">Hola <strong>{display_name}</strong>,</p>
+          <p style="font-size: 14px; color: #94a3b8; line-height: 1.5;">
+            Te recordamos que el partido <strong>{match_desc}</strong> está por comenzar hoy a las <strong>{kickoff_str} (Hora Colombia)</strong>.
+          </p>
+          <p style="font-size: 14px; color: #94a3b8; line-height: 1.5; margin-bottom: 24px;">
+            Aún no has guardado tu predicción para este partido. ¡Ingresa ahora y pon tu marcador para no perder valiosos puntos en el ranking!
+          </p>
+          <a href="https://mundial-2026-zeta-sand.vercel.app" style="background-color: #e5c158; color: #05070a; font-weight: bold; text-decoration: none; padding: 12px 24px; border-radius: 8px; display: inline-block; font-size: 14px;">
+            Ingresar Pronóstico
+          </a>
+        </div>
+      </body>
+    </html>
+    """
+    
+    if not smtp_host or not smtp_user or not smtp_pass:
+        print(f"[EMAIL MOCK] To: {to_email} | Subject: {subject} | Body: Recordatorio para {match_desc} a las {kickoff_str}")
+        return True
+        
+    try:
+        msg = MIMEMultipart()
+        msg['From'] = f"Polla Mundial 2026 <{smtp_from}>"
+        msg['To'] = to_email
+        msg['Subject'] = subject
+        msg.attach(MIMEText(html, 'html'))
+        
+        with smtplib.SMTP(smtp_host, smtp_port) as server:
+            server.starttls()
+            server.login(smtp_user, smtp_pass)
+            server.send_message(msg)
+        print(f"[EMAIL SUCCESS] Sent to {to_email} for match {match_desc}")
+        return True
+    except Exception as e:
+        print(f"[EMAIL ERROR] Failed to send to {to_email}: {e}")
+        return False
+
+async def send_email_reminders_loop():
+    print("[REMINDERS] Email reminders background loop started.")
+    while True:
+        try:
+            db = SessionLocal()
+            now = datetime.utcnow()
+            # Matches starting in the next 2 hours
+            upcoming = db.query(models.Match).filter(
+                models.Match.status == "scheduled",
+                models.Match.match_time > now,
+                models.Match.match_time <= now + timedelta(hours=2)
+            ).all()
+            
+            if upcoming:
+                users = db.query(models.User).all()
+                for match in upcoming:
+                    match_desc = f"{match.home_team} vs {match.away_team}"
+                    # Match time in COT (UTC - 5 hours)
+                    cot_time = match.match_time - timedelta(hours=5)
+                    kickoff_str = cot_time.strftime("%I:%M %p")
+                    
+                    for user in users:
+                        if (user.id, match.id) in SENT_REMINDERS:
+                            continue
+                            
+                        pred = db.query(models.Prediction).filter_by(user_id=user.id, match_id=match.id).first()
+                        if not pred:
+                            if user.email:
+                                send_reminder_email(user.email, user.display_name or "Usuario", match_desc, kickoff_str)
+                                SENT_REMINDERS.add((user.id, match.id))
+            db.close()
+        except Exception as e:
+            print(f"[REMINDERS ERROR] Error in reminder loop: {e}")
+            
+        await asyncio.sleep(1800)  # Check every 30 minutes
+
 @asynccontextmanager
 async def lifespan(application):
-    """Arranca el loop de sincronizacion ESPN al iniciar el servidor."""
-    task = asyncio.create_task(live_sync.live_score_sync_loop())
+    """Arranca los loops de sincronización y recordatorios al iniciar el servidor."""
+    task_sync = asyncio.create_task(live_sync.live_score_sync_loop())
+    task_emails = asyncio.create_task(send_email_reminders_loop())
     yield
-    task.cancel()
+    task_sync.cancel()
+    task_emails.cancel()
     try:
-        await task
-    except asyncio.CancelledError:
+        await asyncio.gather(task_sync, task_emails, return_exceptions=True)
+    except Exception:
         pass
 
 app = FastAPI(title="Mundial Polla API", version="1.0.0", lifespan=lifespan)
@@ -102,7 +208,7 @@ def seed_database():
                     away_team="Ecuador", 
                     home_flag_url=f"{flag_url}/mx.png", 
                     away_flag_url=f"{flag_url}/ec.png",
-                    match_time=datetime(2026, 6, 28, 18, 0),
+                    match_time=datetime(2026, 6, 30, 22, 0),
                     stage="Fase de Grupos",
                     home_score=2,
                     away_score=0,
@@ -113,7 +219,7 @@ def seed_database():
                     away_team="Suecia", 
                     home_flag_url=f"{flag_url}/fr.png", 
                     away_flag_url=f"{flag_url}/se.png",
-                    match_time=datetime(2026, 6, 28, 21, 0),
+                    match_time=datetime(2026, 7, 1, 1, 0),
                     stage="Fase de Grupos",
                     home_score=3,
                     away_score=0,
@@ -124,7 +230,7 @@ def seed_database():
                     away_team="Costa de Marfil", 
                     home_flag_url=f"{flag_url}/no.png", 
                     away_flag_url=f"{flag_url}/ci.png",
-                    match_time=datetime(2026, 6, 29, 15, 0),
+                    match_time=datetime(2026, 6, 30, 22, 0),
                     stage="Fase de Grupos",
                     home_score=2,
                     away_score=1,
@@ -135,7 +241,7 @@ def seed_database():
                     away_team="Japón", 
                     home_flag_url=f"{flag_url}/br.png", 
                     away_flag_url=f"{flag_url}/jp.png",
-                    match_time=datetime(2026, 6, 30, 18, 0),
+                    match_time=datetime(2026, 6, 29, 19, 0),
                     stage="Fase de Grupos",
                     home_score=2,
                     away_score=1,
@@ -146,7 +252,7 @@ def seed_database():
                     away_team="Sudáfrica", 
                     home_flag_url=f"{flag_url}/ca.png", 
                     away_flag_url=f"{flag_url}/za.png",
-                    match_time=datetime(2026, 6, 30, 21, 0),
+                    match_time=datetime(2026, 6, 28, 19, 0),
                     stage="Fase de Grupos",
                     home_score=1,
                     away_score=0,
@@ -159,7 +265,7 @@ def seed_database():
                     away_team="Marruecos", 
                     home_flag_url=f"{flag_url}/ca.png", 
                     away_flag_url=f"{flag_url}/ma.png",
-                    match_time=datetime(2026, 7, 4, 18, 0),
+                    match_time=datetime(2026, 7, 4, 17, 0),
                     stage="Octavos de Final",
                     status="scheduled"
                 ),
@@ -177,7 +283,7 @@ def seed_database():
                     away_team="Noruega", 
                     home_flag_url=f"{flag_url}/br.png", 
                     away_flag_url=f"{flag_url}/no.png",
-                    match_time=datetime(2026, 7, 5, 18, 0),
+                    match_time=datetime(2026, 7, 5, 20, 0),
                     stage="Octavos de Final",
                     status="scheduled"
                 ),
@@ -186,7 +292,7 @@ def seed_database():
                     away_team="Inglaterra", 
                     home_flag_url=f"{flag_url}/mx.png", 
                     away_flag_url=f"{flag_url}/gb.png",
-                    match_time=datetime(2026, 7, 5, 21, 0),
+                    match_time=datetime(2026, 7, 6, 0, 0),
                     stage="Octavos de Final",
                     status="scheduled"
                 ),
@@ -195,7 +301,7 @@ def seed_database():
                     away_team="España", 
                     home_flag_url=f"{flag_url}/pt.png", 
                     away_flag_url=f"{flag_url}/es.png",
-                    match_time=datetime(2026, 7, 6, 18, 0),
+                    match_time=datetime(2026, 7, 6, 19, 0),
                     stage="Octavos de Final",
                     status="scheduled"
                 ),
@@ -204,7 +310,7 @@ def seed_database():
                     away_team="Bélgica", 
                     home_flag_url=f"{flag_url}/us.png", 
                     away_flag_url=f"{flag_url}/be.png",
-                    match_time=datetime(2026, 7, 6, 21, 0),
+                    match_time=datetime(2026, 7, 7, 0, 0),
                     stage="Octavos de Final",
                     status="scheduled"
                 ),
@@ -215,7 +321,7 @@ def seed_database():
                     away_team="Finalista 2", 
                     home_flag_url=f"{flag_url}/un.png", 
                     away_flag_url=f"{flag_url}/un.png",
-                    match_time=datetime(2026, 7, 19, 20, 0),
+                    match_time=datetime(2026, 7, 19, 19, 0),
                     stage="Final",
                     status="scheduled"
                 ),
@@ -400,6 +506,8 @@ def update_current_user_profile(
         db_user.avatar_url = user_update.avatar_url.strip()
     if user_update.password is not None and user_update.password.strip() != "":
         db_user.password_hash = auth.get_password_hash(user_update.password)
+    if user_update.favorite_team is not None:
+        db_user.favorite_team = user_update.favorite_team.strip()
         
     db.commit()
     db.refresh(db_user)
@@ -711,7 +819,7 @@ def reset_database(
             models.Match(
                 home_team="Canadá", away_team="Marruecos", 
                 home_flag_url=f"{flag_url}/ca.png", away_flag_url=f"{flag_url}/ma.png",
-                match_time=datetime(2026, 7, 4, 18, 0), stage="Octavos de Final",
+                match_time=datetime(2026, 7, 4, 17, 0), stage="Octavos de Final",
                 status="scheduled"
             ),
             models.Match(
@@ -723,37 +831,37 @@ def reset_database(
             models.Match(
                 home_team="Brasil", away_team="Noruega", 
                 home_flag_url=f"{flag_url}/br.png", away_flag_url=f"{flag_url}/no.png",
-                match_time=datetime(2026, 7, 5, 18, 0), stage="Octavos de Final",
+                match_time=datetime(2026, 7, 5, 20, 0), stage="Octavos de Final",
                 status="scheduled"
             ),
             models.Match(
                 home_team="México", away_team="Inglaterra", 
                 home_flag_url=f"{flag_url}/mx.png", away_flag_url=f"{flag_url}/gb.png",
-                match_time=datetime(2026, 7, 5, 21, 0), stage="Octavos de Final",
+                match_time=datetime(2026, 7, 6, 0, 0), stage="Octavos de Final",
                 status="scheduled"
             ),
             models.Match(
                 home_team="Portugal", away_team="España", 
                 home_flag_url=f"{flag_url}/pt.png", away_flag_url=f"{flag_url}/es.png",
-                match_time=datetime(2026, 7, 6, 18, 0), stage="Octavos de Final",
+                match_time=datetime(2026, 7, 6, 19, 0), stage="Octavos de Final",
                 status="scheduled"
             ),
             models.Match(
                 home_team="EE. UU.", away_team="Bélgica", 
                 home_flag_url=f"{flag_url}/us.png", away_flag_url=f"{flag_url}/be.png",
-                match_time=datetime(2026, 7, 6, 21, 0), stage="Octavos de Final",
+                match_time=datetime(2026, 7, 7, 0, 0), stage="Octavos de Final",
                 status="scheduled"
             ),
             models.Match(
                 home_team="Argentina / Cabo Verde", away_team="Australia / Egipto", 
                 home_flag_url=f"{flag_url}/un.png", away_flag_url=f"{flag_url}/un.png",
-                match_time=datetime(2026, 7, 7, 18, 0), stage="Octavos de Final",
+                match_time=datetime(2026, 7, 7, 16, 0), stage="Octavos de Final",
                 status="scheduled"
             ),
             models.Match(
                 home_team="Suiza / Argelia", away_team="Colombia / Ghana", 
                 home_flag_url=f"{flag_url}/un.png", away_flag_url=f"{flag_url}/un.png",
-                match_time=datetime(2026, 7, 7, 21, 0), stage="Octavos de Final",
+                match_time=datetime(2026, 7, 7, 20, 0), stage="Octavos de Final",
                 status="scheduled"
             ),
 
@@ -761,25 +869,25 @@ def reset_database(
             models.Match(
                 home_team="TBD", away_team="TBD", 
                 home_flag_url=f"{flag_url}/un.png", away_flag_url=f"{flag_url}/un.png",
-                match_time=datetime(2026, 7, 11, 20, 0), stage="Cuartos de Final",
+                match_time=datetime(2026, 7, 9, 20, 0), stage="Cuartos de Final",
                 status="scheduled"
             ),
             models.Match(
                 home_team="TBD", away_team="TBD", 
                 home_flag_url=f"{flag_url}/un.png", away_flag_url=f"{flag_url}/un.png",
-                match_time=datetime(2026, 7, 12, 20, 0), stage="Cuartos de Final",
+                match_time=datetime(2026, 7, 10, 19, 0), stage="Cuartos de Final",
                 status="scheduled"
             ),
             models.Match(
                 home_team="TBD", away_team="TBD", 
                 home_flag_url=f"{flag_url}/un.png", away_flag_url=f"{flag_url}/un.png",
-                match_time=datetime(2026, 7, 13, 20, 0), stage="Cuartos de Final",
+                match_time=datetime(2026, 7, 11, 21, 0), stage="Cuartos de Final",
                 status="scheduled"
             ),
             models.Match(
                 home_team="TBD", away_team="TBD", 
                 home_flag_url=f"{flag_url}/un.png", away_flag_url=f"{flag_url}/un.png",
-                match_time=datetime(2026, 7, 14, 20, 0), stage="Cuartos de Final",
+                match_time=datetime(2026, 7, 12, 1, 0), stage="Cuartos de Final",
                 status="scheduled"
             ),
 
@@ -787,13 +895,13 @@ def reset_database(
             models.Match(
                 home_team="TBD", away_team="TBD", 
                 home_flag_url=f"{flag_url}/un.png", away_flag_url=f"{flag_url}/un.png",
-                match_time=datetime(2026, 7, 15, 20, 0), stage="Semifinal",
+                match_time=datetime(2026, 7, 15, 0, 0), stage="Semifinal",
                 status="scheduled"
             ),
             models.Match(
                 home_team="TBD", away_team="TBD", 
                 home_flag_url=f"{flag_url}/un.png", away_flag_url=f"{flag_url}/un.png",
-                match_time=datetime(2026, 7, 16, 20, 0), stage="Semifinal",
+                match_time=datetime(2026, 7, 16, 0, 0), stage="Semifinal",
                 status="scheduled"
             ),
 
@@ -801,7 +909,7 @@ def reset_database(
             models.Match(
                 home_team="TBD", away_team="TBD", 
                 home_flag_url=f"{flag_url}/un.png", away_flag_url=f"{flag_url}/un.png",
-                match_time=datetime(2026, 7, 18, 20, 0), stage="3er Puesto",
+                match_time=datetime(2026, 7, 18, 19, 0), stage="3er Puesto",
                 status="scheduled"
             ),
 
@@ -809,7 +917,7 @@ def reset_database(
             models.Match(
                 home_team="TBD", away_team="TBD", 
                 home_flag_url=f"{flag_url}/un.png", away_flag_url=f"{flag_url}/un.png",
-                match_time=datetime(2026, 7, 19, 20, 0), stage="Final",
+                match_time=datetime(2026, 7, 19, 19, 0), stage="Final",
                 status="scheduled"
             ),
         ]

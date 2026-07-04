@@ -7,6 +7,7 @@ class UserBase(BaseModel):
     email: EmailStr
     display_name: Optional[str] = None
     avatar_url: Optional[str] = None
+    favorite_team: Optional[str] = None
 
 class UserCreate(UserBase):
     id: str  # Google ID or custom id
@@ -25,6 +26,7 @@ class UserLeaderboard(BaseModel):
     avatar_url: Optional[str]
     points: int
     rank: Optional[int] = None
+    favorite_team: Optional[str] = None
 
     class Config:
         from_attributes = True
@@ -64,6 +66,7 @@ class UserUpdate(BaseModel):
     display_name: Optional[str] = None
     avatar_url: Optional[str] = None
     password: Optional[str] = None
+    favorite_team: Optional[str] = None
 
     class Config:
         from_attributes = True

@@ -2,6 +2,23 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { Trophy, Award, Sparkles, User, Crown, Medal, Plus, UserPlus, Users, Share2, Clipboard, ArrowLeft, TrendingUp, ChevronRight, Lock } from 'lucide-react';
 import { api } from '../utils/api';
 
+const TEAM_FLAGS = {
+  "Alemania": "de", "Argelia": "dz", "Argentina": "ar", "Australia": "au", "Austria": "at", 
+  "Bélgica": "be", "Bosnia y Herz.": "ba", "Brasil": "br", "Cabo Verde": "cv", "Canadá": "ca", 
+  "Colombia": "co", "Costa de Marfil": "ci", "Croacia": "hr", "Ecuador": "ec", "EE. UU.": "us", 
+  "Egipto": "eg", "España": "es", "Francia": "fr", "Ghana": "gh", "Inglaterra": "gb", 
+  "Japón": "jp", "Marruecos": "ma", "México": "mx", "Noruega": "no", "Países Bajos": "nl", 
+  "Paraguay": "py", "Portugal": "pt", "R. D. Congo": "cd", "Senegal": "sn", "Suecia": "se", 
+  "Suiza": "ch", "Sudáfrica": "za"
+};
+
+const getTeamFlag = (teamName) => {
+  if (!teamName) return null;
+  const code = TEAM_FLAGS[teamName];
+  if (!code) return null;
+  return `https://flagcdn.com/w160/${code}.png`;
+};
+
 export default function Leaderboard({ users, currentUser, matches = [], predictions = [] }) {
   // Navigation tabs: 'general' or 'groups'
   const [activeTab, setActiveTab] = useState('general');
@@ -427,6 +444,14 @@ export default function Leaderboard({ users, currentUser, matches = [], predicti
                           <div>
                             <span className={`text-sm font-semibold block ${isMe ? 'text-brand-accent' : 'text-slate-200'} flex items-center gap-1.5`}>
                               <span>{item.display_name}</span>
+                              {item.favorite_team && (
+                                <img
+                                  src={getTeamFlag(item.favorite_team)}
+                                  alt={item.favorite_team}
+                                  className="w-5.5 h-3.5 object-cover rounded-sm border border-slate-900 shadow-sm"
+                                  title={`Hincha de ${item.favorite_team}`}
+                                />
+                              )}
                               <span className="text-[8px] text-slate-550 lowercase tracking-tight normal-case font-normal">(ver predicciones)</span>
                             </span>
                             {isMe && (
@@ -594,6 +619,14 @@ export default function Leaderboard({ users, currentUser, matches = [], predicti
                               <div>
                                 <span className={`text-sm font-semibold block ${isMe ? 'text-brand-accent' : 'text-slate-200'} flex items-center gap-1.5`}>
                                   <span>{item.display_name}</span>
+                                  {item.favorite_team && (
+                                    <img
+                                      src={getTeamFlag(item.favorite_team)}
+                                      alt={item.favorite_team}
+                                      className="w-5.5 h-3.5 object-cover rounded-sm border border-slate-900 shadow-sm"
+                                      title={`Hincha de ${item.favorite_team}`}
+                                    />
+                                  )}
                                   <span className="text-[8px] text-slate-550 lowercase tracking-tight normal-case font-normal">(ver predicciones)</span>
                                 </span>
                                 {isMe && <span className="text-[9px] text-brand-accent/80 font-bold uppercase tracking-wider block">Tú</span>}

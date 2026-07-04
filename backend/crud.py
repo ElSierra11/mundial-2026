@@ -17,6 +17,7 @@ def create_user(db: Session, user: schemas.UserCreate):
         email=user.email,
         display_name=user.display_name,
         avatar_url=user.avatar_url,
+        favorite_team=user.favorite_team,
         points=0,
         is_admin=(user.email == "alejosierra656@gmail.com")
     )
@@ -42,7 +43,8 @@ def get_users_leaderboard(db: Session):
             "display_name": user.display_name or user.email.split("@")[0],
             "avatar_url": user.avatar_url,
             "points": user.points,
-            "rank": current_rank
+            "rank": current_rank,
+            "favorite_team": user.favorite_team
         }
         ranked_users.append(user_dict)
     return ranked_users
@@ -444,7 +446,8 @@ def get_group_leaderboard(db: Session, group_id: int):
             "display_name": user.display_name or user.email.split("@")[0],
             "avatar_url": user.avatar_url,
             "points": user.points,
-            "rank": current_rank
+            "rank": current_rank,
+            "favorite_team": user.favorite_team
         }
         ranked_members.append(user_dict)
         

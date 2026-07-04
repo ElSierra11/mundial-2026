@@ -30,8 +30,8 @@ SYNC_INTERVAL = 60
 TEAM_NAME_MAP = {
     # Inglés -> Español (como estan en la DB)
     "Mexico": "México",
-    "United States": "Estados Unidos",
-    "USA": "Estados Unidos",
+    "United States": "EE. UU.",
+    "USA": "EE. UU.",
     "Canada": "Canadá",
     "Brazil": "Brasil",
     "Germany": "Alemania",
@@ -40,6 +40,11 @@ TEAM_NAME_MAP = {
     "Portugal": "Portugal",
     "Argentina": "Argentina",
     "Colombia": "Colombia",
+    "Cape Verde": "Cabo Verde",
+    "Bosnia and Herzegovina": "Bosnia y Herz.",
+    "Bosnia & Herzegovina": "Bosnia y Herz.",
+    "DR Congo": "R. D. Congo",
+    "Democratic Republic of Congo": "R. D. Congo",
     "Ecuador": "Ecuador",
     "Uruguay": "Uruguay",
     "Chile": "Chile",
@@ -335,13 +340,13 @@ def sync_scores_to_db(events: list[dict]):
                         f"| {espn_home_score}-{espn_away_score} (Pens: {espn_home_penalties}-{espn_away_penalties}, Winner: {espn_penalties_winner}) | {espn_status}"
                     )
                     
-                    # Si el partido acabo, recalcular puntos y avanzar la llave
-                    if espn_status == "finished" and old_status != "finished":
+                    # Si el partido terminó, recalcular puntos y avanzar la llave (siempre que esté terminado)
+                    if espn_status == "finished":
                         crud.recalculate_points_for_match(db, db_match.id)
                         crud.advance_bracket_winner(db, db_match.id)
                         recalculate_needed = True
                         logger.info(
-                            f"[LiveSync] Partido terminado! Recalculando puntos y avanzando llave para match_id={db_match.id}"
+                            f"[LiveSync] Partido terminado/actualizado! Recalculando puntos y avanzando llave para match_id={db_match.id}"
                         )
             
             except Exception as e:

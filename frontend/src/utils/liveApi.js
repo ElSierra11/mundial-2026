@@ -19,6 +19,8 @@ const TEAM_NAME_MAP = {
   'democratic republic of congo': 'R. D. Congo', 'nigeria': 'Nigeria',
   'costa rica': 'Costa Rica', 'chile': 'Chile', 'uruguay': 'Uruguay',
   'peru': 'Perú',
+  'bosnia and herzegovina': 'Bosnia y Herz.',
+  'bosnia & herzegovina': 'Bosnia y Herz.',
 };
 
 function normalizeTeamName(name) {

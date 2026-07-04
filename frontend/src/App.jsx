@@ -415,7 +415,7 @@ export default function App() {
 
             {/* Chat Tab */}
             {activeTab === 'chat' && (
-              <ChatView user={user} isDemo={isDemo} />
+              <ChatView user={user} isDemo={isDemo} leaderboard={leaderboard} />
             )}
 
             {/* Profile Tab */}
