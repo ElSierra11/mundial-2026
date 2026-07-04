@@ -55,6 +55,7 @@ export default function ChampionPoll() {
       setData(result);
     } catch (err) {
       console.error('Error loading champion votes:', err);
+      // Fail silently for rendering, but help debug
     } finally {
       setLoading(false);
     }
@@ -75,6 +76,7 @@ export default function ChampionPoll() {
       setShowPicker(false);
     } catch (err) {
       console.error('Error voting:', err);
+      alert('Error al registrar tu voto: ' + err.message);
     } finally {
       setVoting(false);
     }
