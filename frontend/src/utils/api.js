@@ -141,8 +141,8 @@ export const api = {
   async checkHealth() {
     try {
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 1000);
-      const res = await fetch(`${API_BASE_URL}/api/matches`, { signal: controller.signal });
+      const timeoutId = setTimeout(() => controller.abort(), 3000);
+      const res = await fetch(`${API_BASE_URL}/api/health`, { signal: controller.signal });
       clearTimeout(timeoutId);
       return res.ok;
     } catch {

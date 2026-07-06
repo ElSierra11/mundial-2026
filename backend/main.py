@@ -380,6 +380,10 @@ seed_database()
 
 # ENDPOINTS
 
+@app.get("/api/health")
+def health_check():
+    return {"status": "ok"}
+
 @app.post("/api/auth/google")
 def google_auth(request: schemas.GoogleLoginRequest, db: Session = Depends(get_db)):
     # Verify Google token

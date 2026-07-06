@@ -1,5 +1,5 @@
-from sqlalchemy.orm import Session
-from sqlalchemy import func
+from sqlalchemy.orm import Session, joinedload
+from sqlalchemy import func, text
 import models
 import schemas
 from datetime import datetime
@@ -333,27 +333,16 @@ def recalculate_points_for_match(db: Session, match_id: int):
     db.commit()
 
 def recalculate_all_user_points(db: Session):
-    # Set all users' points to 0
-    db.query(models.User).update({models.User.points: 0})
-    db.commit()
-    
-    # Calculate sum of points_earned for each user from finished predictions
-    user_points = db.query(
-        models.Prediction.user_id,
-        func.sum(models.Prediction.points_earned).label("total_points")
-    ).filter(models.Prediction.points_earned != None).group_by(models.Prediction.user_id).all()
-    
-    # Update each user with their total points
-    for up in user_points:
-        user = get_user(db, up.user_id)
-        if user:
-            user.points = int(up.total_points or 0)
-            
+    db.execute(text(
+        "UPDATE users SET points = COALESCE("
+        "(SELECT SUM(points_earned) FROM predictions "
+        " WHERE predictions.user_id = users.id AND predictions.points_earned IS NOT NULL), 0)"
+    ))
     db.commit()
 
 
 def get_chat_messages(db: Session, limit: int = 50):
-    return db.query(models.Message).order_by(models.Message.timestamp.asc()).limit(limit).all()
+    return db.query(models.Message).options(joinedload(models.Message.user)).order_by(models.Message.timestamp.asc()).limit(limit).all()
 
 
 def create_chat_message(db: Session, text: str, user_id: str, user_name: str, user_avatar: str):

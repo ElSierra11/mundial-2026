@@ -120,7 +120,7 @@ export default function MatchCard({ match, prediction, onSavePrediction }) {
       };
       fetchPreds();
     }
-  }, [match.id, match.status, prediction]);
+  }, [match.id, match.status, prediction?.id, prediction?.home_prediction, prediction?.away_prediction]);
 
   // Fetch ESPN stats when match is live or finished
   useEffect(() => {
