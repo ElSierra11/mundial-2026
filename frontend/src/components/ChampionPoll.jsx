@@ -238,7 +238,10 @@ export default function ChampionPoll() {
 
                     {/* Voters tooltip on hover */}
                     {hoveredTeam === r.team && r.voters?.length > 0 && (
-                      <div className="absolute right-2 top-full mt-1 z-50 bg-slate-900 border border-slate-700 rounded-xl p-2.5 shadow-2xl min-w-[160px]">
+                      <div
+                        className="absolute right-2 z-55 bg-slate-900 border border-slate-700 rounded-xl p-2.5 shadow-2xl min-w-[160px]"
+                        style={idx >= Math.max(1, results.length - 2) ? { bottom: '100%', marginBottom: '4px' } : { top: '100%', marginTop: '4px' }}
+                      >
                         <p className="text-[8px] font-black text-slate-500 uppercase tracking-wider mb-2">
                           Votan por {r.team}:
                         </p>

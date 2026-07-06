@@ -42,6 +42,15 @@ function Toast({ toasts, removeToast }) {
   );
 }
 
+const checkInternetConnection = async () => {
+  try {
+    await fetch("https://cloudflare.com/cdn-cgi/trace", { mode: 'no-cors', signal: AbortSignal.timeout(1500) });
+    return true;
+  } catch (e) {
+    return false;
+  }
+};
+
 export default function App() {
   const [user, setUser] = useState(null);
   const [isOnline, setIsOnline] = useState(navigator.onLine);
@@ -194,12 +203,22 @@ export default function App() {
     return () => clearInterval(interval);
   }, [syncLiveScores]);
 
-  // Periodically check if backend status changes
+  // Periodically check if backend status changes and check internet connectivity
   useEffect(() => {
-    const interval = setInterval(async () => {
+    const checkConnection = async () => {
       const online = await api.checkHealth();
       setBackendOnline(online);
-    }, 15000);
+      
+      if (!online) {
+        const hasInternet = await checkInternetConnection();
+        setIsOnline(hasInternet);
+      } else {
+        setIsOnline(true);
+      }
+    };
+    
+    checkConnection();
+    const interval = setInterval(checkConnection, 15000);
     return () => clearInterval(interval);
   }, []);
 
@@ -322,7 +341,10 @@ export default function App() {
   if (!isOnline) {
     return (
       <div className="min-h-screen bg-stadium-gradient pb-10 flex items-center justify-center px-4 py-12">
-        <OfflineGame onRetryConnection={() => setIsOnline(navigator.onLine)} />
+        <OfflineGame onRetryConnection={async () => {
+          const hasInternet = await checkInternetConnection();
+          setIsOnline(hasInternet);
+        }} />
       </div>
     );
   }
