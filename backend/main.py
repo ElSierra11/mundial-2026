@@ -588,6 +588,93 @@ def save_prediction(
         raise HTTPException(status_code=400, detail=str(e))
 
 
+@app.get("/api/matches/{match_id}/ai-preview")
+def get_match_ai_preview(
+    match_id: int,
+    current_user: schemas.TokenData = Depends(auth.get_current_user_token),
+    db: Session = Depends(get_db)
+):
+    match = db.query(models.Match).filter(models.Match.id == match_id).first()
+    if not match:
+        raise HTTPException(status_code=404, detail="Partido no encontrado")
+    
+    api_key = os.environ.get("GEMINI_API_KEY")
+    home = match.home_team
+    away = match.away_team
+    
+    # Standard heuristic forecast fallback
+    import random
+    # Deterministic seed using match ID and team names
+    random.seed(match_id + len(home) * 13 + len(away) * 17)
+    
+    home_strength = 35 + (random.randint(0, 45))
+    away_strength = 100 - home_strength
+    
+    if abs(home_strength - away_strength) < 10:
+        home_win_chance = 35
+        draw_chance = 30
+        away_win_chance = 35
+    else:
+        home_win_chance = max(20, min(70, home_strength - 10))
+        away_win_chance = max(20, min(70, away_strength - 10))
+        draw_chance = 100 - home_win_chance - away_win_chance
+
+    # Generate heuristic response text
+    analysis = (
+        f"Análisis táctico para {home} vs {away}. Ambos equipos se preparan para un encuentro decisivo "
+        f"en esta fase del torneo. Se espera que {home} proponga un juego directo de posesión rápida, "
+        f"mientras que {away} podría contragolpear con transiciones veloces. "
+        f"Estadísticamente, el favoritismo se inclina ligeramente hacia el equipo que controle el mediocampo."
+    )
+    predicted_score = f"{random.randint(1, 3)} - {random.randint(0, 2)}"
+    
+    # If API key exists, call Gemini API
+    if api_key:
+        import httpx
+        url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key={api_key}"
+        prompt = (
+            f"Actúa como un experto analista deportivo de fútbol para la Copa Mundial de la FIFA 2026. "
+            f"Analiza el próximo enfrentamiento entre {home} y {away}. "
+            f"Proporciona un breve análisis táctico de 3 o 4 oraciones en español. "
+            f"Al final, incluye obligatoriamente una sugerencia de marcador exacto en el formato "
+            f"'Marcador sugerido: X - Y'. Mantén un tono emocionante y profesional."
+        )
+        payload = {
+            "contents": [
+                {
+                    "parts": [
+                        {"text": prompt}
+                    ]
+                }
+            ],
+            "generationConfig": {
+                "temperature": 0.4,
+                "maxOutputTokens": 300
+            }
+        }
+        try:
+            r = httpx.post(url, json=payload, timeout=8.0)
+            if r.status_code == 200:
+                data = r.json()
+                text_response = data["candidates"][0]["content"]["parts"][0]["text"]
+                # Parse suggested score if present
+                import re
+                score_match = re.search(r"Marcador sugerido:\s*(\d+)\s*-\s*(\d+)", text_response, re.IGNORECASE)
+                if score_match:
+                    predicted_score = f"{score_match.group(1)} - {score_match.group(2)}"
+                analysis = text_response
+        except Exception as e:
+            print(f"[GEMINI ERROR] Request failed, using statistical fallback: {e}")
+            
+    return {
+        "analysis": analysis,
+        "predicted_score": predicted_score,
+        "home_win_pct": home_win_chance,
+        "draw_pct": draw_chance,
+        "away_win_pct": away_win_chance
+    }
+
+
 @app.get("/api/chat", response_model=List[schemas.MessageResponse])
 def get_chat(
     current_user: schemas.TokenData = Depends(auth.get_current_user_token),

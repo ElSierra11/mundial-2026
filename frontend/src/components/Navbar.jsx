@@ -1,6 +1,13 @@
 import { Trophy, Calendar, ShieldCheck, LogOut, Sparkles, GitBranch, MessageSquare, User, Users } from 'lucide-react';
+import { playClickSound, triggerHapticFeedback } from '../utils/soundEffects';
 
 export default function Navbar({ activeTab, setActiveTab, user, onLogout, isDemo }) {
+  const handleTabClick = (tabId) => {
+    playClickSound();
+    triggerHapticFeedback(15);
+    setActiveTab(tabId);
+  };
+
   return (
     <>
       {/* Desktop Header Navbar */}
@@ -26,7 +33,7 @@ export default function Navbar({ activeTab, setActiveTab, user, onLogout, isDemo
           {/* Navigation Links */}
           <nav className="flex items-center gap-2 bg-slate-950/40 p-1.5 rounded-2xl border border-slate-800/80">
             <button
-              onClick={() => setActiveTab('bracket')}
+              onClick={() => handleTabClick('bracket')}
               className={`flex items-center gap-2 py-2 px-4 rounded-xl text-sm font-semibold transition-all ${
                 activeTab === 'bracket'
                   ? 'bg-brand-gold text-brand-dark shadow-lg shadow-brand-gold/15'
@@ -38,7 +45,7 @@ export default function Navbar({ activeTab, setActiveTab, user, onLogout, isDemo
             </button>
 
             <button
-              onClick={() => setActiveTab('matches')}
+              onClick={() => handleTabClick('matches')}
               className={`flex items-center gap-2 py-2 px-4 rounded-xl text-sm font-semibold transition-all ${
                 activeTab === 'matches'
                   ? 'bg-brand-gold text-brand-dark shadow-lg shadow-brand-gold/15'
@@ -50,7 +57,7 @@ export default function Navbar({ activeTab, setActiveTab, user, onLogout, isDemo
             </button>
 
             <button
-              onClick={() => setActiveTab('leaderboard')}
+              onClick={() => handleTabClick('leaderboard')}
               className={`flex items-center gap-2 py-2 px-4 rounded-xl text-sm font-semibold transition-all ${
                 activeTab === 'leaderboard'
                   ? 'bg-brand-gold text-brand-dark shadow-lg shadow-brand-gold/15'
@@ -62,7 +69,7 @@ export default function Navbar({ activeTab, setActiveTab, user, onLogout, isDemo
             </button>
 
             <button
-              onClick={() => setActiveTab('chat')}
+              onClick={() => handleTabClick('chat')}
               className={`flex items-center gap-2 py-2 px-4 rounded-xl text-sm font-semibold transition-all ${
                 activeTab === 'chat'
                   ? 'bg-brand-gold text-brand-dark shadow-lg shadow-brand-gold/15'
@@ -74,7 +81,7 @@ export default function Navbar({ activeTab, setActiveTab, user, onLogout, isDemo
             </button>
 
             <button
-              onClick={() => setActiveTab('groups')}
+              onClick={() => handleTabClick('groups')}
               className={`flex items-center gap-2 py-2 px-4 rounded-xl text-sm font-semibold transition-all ${
                 activeTab === 'groups'
                   ? 'bg-brand-gold text-brand-dark shadow-lg shadow-brand-gold/15'
@@ -86,7 +93,7 @@ export default function Navbar({ activeTab, setActiveTab, user, onLogout, isDemo
             </button>
 
             <button
-              onClick={() => setActiveTab('profile')}
+              onClick={() => handleTabClick('profile')}
               className={`flex items-center gap-2 py-2 px-4 rounded-xl text-sm font-semibold transition-all ${
                 activeTab === 'profile'
                   ? 'bg-brand-gold text-brand-dark shadow-lg shadow-brand-gold/15'
@@ -99,7 +106,7 @@ export default function Navbar({ activeTab, setActiveTab, user, onLogout, isDemo
 
             {user?.is_admin && (
               <button
-                onClick={() => setActiveTab('admin')}
+                onClick={() => handleTabClick('admin')}
                 className={`flex items-center gap-2 py-2 px-4 rounded-xl text-sm font-semibold transition-all ${
                   activeTab === 'admin'
                     ? 'bg-brand-purple text-white shadow-lg shadow-brand-purple/20'
@@ -132,7 +139,11 @@ export default function Navbar({ activeTab, setActiveTab, user, onLogout, isDemo
             </div>
 
             <button
-              onClick={onLogout}
+              onClick={() => {
+                playClickSound();
+                triggerHapticFeedback(30);
+                onLogout();
+              }}
               className="p-2.5 rounded-xl border border-slate-800 hover:border-red-500/30 hover:bg-red-500/10 text-slate-400 hover:text-red-400 transition-all"
               title="Cerrar Sesión"
             >
@@ -170,7 +181,11 @@ export default function Navbar({ activeTab, setActiveTab, user, onLogout, isDemo
           </div>
 
           <button
-            onClick={onLogout}
+            onClick={() => {
+              playClickSound();
+              triggerHapticFeedback(30);
+              onLogout();
+            }}
             className="p-2 rounded-xl text-slate-400 active:text-red-400 transition-all"
           >
             <LogOut className="w-4 h-4" />
@@ -193,7 +208,7 @@ export default function Navbar({ activeTab, setActiveTab, user, onLogout, isDemo
           return (
             <button
               key={tab.id}
-              onClick={() => setActiveTab(tab.id)}
+              onClick={() => handleTabClick(tab.id)}
               className={`relative flex flex-col items-center gap-0.5 py-1 px-3 rounded-xl transition-all duration-200 ${
                 isActive
                   ? tab.id === 'admin' ? 'text-brand-purple' : 'text-brand-gold'

@@ -9,10 +9,12 @@ import GroupsView from './components/GroupsView';
 import ChatView from './components/ChatView';
 import ProfileView from './components/ProfileView';
 import ChampionPoll from './components/ChampionPoll';
+import OfflineGame from './components/OfflineGame';
 import { api } from './utils/api';
 import { fetchLiveWorldCupScores, mergeLiveData } from './utils/liveApi';
 import { Sparkles, Radio, Database, AlertCircle, Calendar, Wifi, WifiOff, CheckCircle2, XCircle, Info } from 'lucide-react';
 import { triggerConfetti } from './utils/confetti';
+import { playGoalChime, triggerHapticFeedback } from './utils/soundEffects';
 
 // ─── Global Toast Component ────────────────────────────────────────────────────
 function Toast({ toasts, removeToast }) {
@@ -42,6 +44,7 @@ function Toast({ toasts, removeToast }) {
 
 export default function App() {
   const [user, setUser] = useState(null);
+  const [isOnline, setIsOnline] = useState(navigator.onLine);
   const [activeTab, setActiveTab] = useState('bracket');
   const [matches, setMatches] = useState([]);
   const [predictions, setPredictions] = useState([]);
@@ -67,6 +70,18 @@ export default function App() {
 
   // Filter for matches tab
   const [selectedStage, setSelectedStage] = useState('Pendientes');
+
+  // Network listeners
+  useEffect(() => {
+    const handleOnline = () => setIsOnline(true);
+    const handleOffline = () => setIsOnline(false);
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
+    return () => {
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('offline', handleOffline);
+    };
+  }, []);
 
   // Check if user is already logged in & check backend health
   useEffect(() => {
@@ -110,12 +125,57 @@ export default function App() {
     loadAppData();
   }, [user]);
 
+  // Live goal score notification helper
+  const checkAndNotifyScoreChanges = useCallback((newLiveMatches) => {
+    if (typeof Notification === 'undefined' || Notification.permission !== 'granted') return;
+    
+    newLiveMatches.forEach(lm => {
+      const currentMatch = matches.find(m => 
+        m.home_team.toLowerCase() === lm.home_team.toLowerCase() &&
+        m.away_team.toLowerCase() === lm.away_team.toLowerCase()
+      );
+      
+      if (currentMatch && lm.status === 'live') {
+        const prevLive = liveMatches.find(pm => 
+          pm.home_team.toLowerCase() === lm.home_team.toLowerCase() && 
+          pm.away_team.toLowerCase() === lm.away_team.toLowerCase()
+        );
+        
+        const oldHome = prevLive ? prevLive.home_score : currentMatch.home_score;
+        const oldAway = prevLive ? prevLive.away_score : currentMatch.away_score;
+        
+        if (oldHome !== null && oldAway !== null && lm.home_score !== null && lm.away_score !== null) {
+          if (lm.home_score > oldHome) {
+            showGoalNotification(lm.home_team, lm.home_score, lm.away_score, lm.away_team);
+          } else if (lm.away_score > oldAway) {
+            showGoalNotification(lm.away_team, lm.home_score, lm.away_score, lm.home_team);
+          }
+        }
+      }
+    });
+  }, [matches, liveMatches]);
+
+  const showGoalNotification = (scoringTeam, homeScore, awayScore, opposingTeam) => {
+    try {
+      playGoalChime();
+      triggerHapticFeedback(80);
+      
+      new Notification("⚽ ¡GOOOL EN VIVO!", {
+        body: `¡Gol de ${scoringTeam}! Marcador actual: ${homeScore} - ${awayScore}`,
+        icon: '/logo.png'
+      });
+    } catch (e) {
+      console.warn("Could not fire notification:", e);
+    }
+  };
+
   // ── ESPN Live Score polling (every 60 seconds) ──────────────────────────────
   const syncLiveScores = useCallback(async () => {
     if (!user) return;
     try {
       const live = await fetchLiveWorldCupScores();
       if (live && live.length > 0) {
+        checkAndNotifyScoreChanges(live);
         setLiveMatches(live);
         setLiveConnected(true);
         const now = new Date().toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit', timeZone: 'America/Bogota' });
@@ -126,7 +186,7 @@ export default function App() {
     } catch (e) {
       setLiveConnected(false);
     }
-  }, [user]);
+  }, [user, checkAndNotifyScoreChanges]);
 
   useEffect(() => {
     syncLiveScores();
@@ -256,6 +316,14 @@ export default function App() {
         loginError={loginError} 
         onClearError={() => setLoginError('')} 
       />
+    );
+  }
+
+  if (!isOnline) {
+    return (
+      <div className="min-h-screen bg-stadium-gradient pb-10 flex items-center justify-center px-4 py-12">
+        <OfflineGame onRetryConnection={() => setIsOnline(navigator.onLine)} />
+      </div>
     );
   }
 

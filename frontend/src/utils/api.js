@@ -612,6 +612,31 @@ export const api = {
     return await response.json();
   },
 
+  async getAIPreview(matchId) {
+    if (this.getMode() === "demo") {
+      const demoMatches = JSON.parse(localStorage.getItem("demo_matches") || "[]");
+      const match = demoMatches.find(m => m.id === matchId) || { home_team: "Local", away_team: "Visitante" };
+      const home = match.home_team;
+      const away = match.away_team;
+      const deterministicHash = (home.length * 13 + away.length * 17 + matchId) % 100;
+      const homeWins = 30 + (deterministicHash % 40);
+      const draw = 15 + ((deterministicHash >> 2) % 25);
+      const awayWins = 100 - homeWins - draw;
+      const scores = ["2 - 1", "1 - 0", "1 - 1", "0 - 2", "2 - 2"];
+      const predictedScore = scores[deterministicHash % scores.length];
+      return {
+        analysis: `[Simulación Demo] Análisis detallado de Inteligencia Artificial para el partido ${home} contra ${away}. El equipo local llega con una racha sólida de forma, mientras que los visitantes plantean una estrategia defensiva muy compacta. Se prevé un enfrentamiento reñido en el mediocampo.`,
+        predicted_score: predictedScore,
+        home_win_pct: homeWins,
+        draw_pct: draw,
+        away_win_pct: awayWins
+      };
+    }
+    const response = await fetch(`${API_BASE_URL}/api/matches/${matchId}/ai-preview`, { headers: getHeaders() });
+    if (!response.ok) throw new Error("Error al obtener la predicción de IA");
+    return await response.json();
+  },
+
   // ─── Private Leagues / Groups ──────────────────────────────────────────────────
   async createGroup(name) {
     if (this.getMode() === "demo") {

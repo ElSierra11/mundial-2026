@@ -1,6 +1,8 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { Trophy, Award, Sparkles, User, Crown, Medal, Plus, UserPlus, Users, Share2, Clipboard, ArrowLeft, TrendingUp, ChevronRight, Lock } from 'lucide-react';
 import { api } from '../utils/api';
+import ShareCardModal from './ShareCardModal';
+import { playClickSound, triggerHapticFeedback } from '../utils/soundEffects';
 
 const TEAM_FLAGS = {
   "Alemania": "de", "Argelia": "dz", "Argentina": "ar", "Australia": "au", "Austria": "at", 
@@ -22,6 +24,7 @@ const getTeamFlag = (teamName) => {
 export default function Leaderboard({ users, currentUser, matches = [], predictions = [] }) {
   // Navigation tabs: 'general' or 'groups'
   const [activeTab, setActiveTab] = useState('general');
+  const [showShareModal, setShowShareModal] = useState(false);
   
   // Private groups state
   const [groups, setGroups] = useState([]);
@@ -241,7 +244,7 @@ export default function Leaderboard({ users, currentUser, matches = [], predicti
     <div className="w-full max-w-2xl mx-auto space-y-6">
       
       {/* Header Banner */}
-      <div className="glass rounded-3xl p-6 border border-slate-800 flex items-center justify-between relative overflow-hidden">
+      <div className="glass rounded-3xl p-6 border border-slate-800 flex items-center justify-between relative overflow-hidden flex-wrap gap-4">
         <div className="absolute right-0 top-0 w-36 h-36 bg-brand-accent/5 rounded-full blur-2xl pointer-events-none"></div>
         <div className="absolute left-10 bottom-0 w-24 h-24 bg-brand-purple/5 rounded-full blur-xl pointer-events-none"></div>
 
@@ -254,6 +257,18 @@ export default function Leaderboard({ users, currentUser, matches = [], predicti
             <p className="text-slate-400 text-xs mt-0.5">Compite en la general o en tus ligas privadas</p>
           </div>
         </div>
+
+        <button
+          onClick={() => {
+            playClickSound();
+            triggerHapticFeedback(30);
+            setShowShareModal(true);
+          }}
+          className="z-10 flex items-center gap-2 py-2.5 px-4 rounded-xl bg-brand-gold text-brand-dark hover:bg-amber-400 text-xs font-extrabold uppercase tracking-wider transition-all shadow-lg shadow-brand-gold/10"
+        >
+          <Award className="w-4 h-4" />
+          <span>Mi Tarjeta FUT</span>
+        </button>
       </div>
 
       {/* Tab Selector */}
@@ -829,6 +844,15 @@ export default function Leaderboard({ users, currentUser, matches = [], predicti
           <li>Puedes enviar o editar tu marcador antes de que empiece el partido. Una vez iniciado o finalizado, se bloquearán tus predicciones.</li>
         </ul>
       </div>
+
+      {showShareModal && (
+        <ShareCardModal
+          user={currentUser}
+          predictions={predictions}
+          matches={matches}
+          onClose={() => setShowShareModal(false)}
+        />
+      )}
       
     </div>
   );

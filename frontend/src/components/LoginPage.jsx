@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { Trophy, ShieldAlert, MapPin, Shield, Sparkles, User, Mail, Lock } from 'lucide-react';
+import { playClickSound, playWhistleSound, triggerHapticFeedback } from '../utils/soundEffects';
 
 export default function LoginPage({ onLoginSuccess, onEmailLogin, onEmailRegister, loginError = '', onClearError }) {
   const [localError, setLocalError] = useState('');
@@ -31,6 +32,8 @@ export default function LoginPage({ onLoginSuccess, onEmailLogin, onEmailRegiste
   };
 
   const handleDemoLogin = async () => {
+    playWhistleSound();
+    triggerHapticFeedback(60);
     setLoading(true);
     clearError();
     try {
@@ -44,6 +47,8 @@ export default function LoginPage({ onLoginSuccess, onEmailLogin, onEmailRegiste
 
   const handleEmailSubmit = async (e) => {
     e.preventDefault();
+    playClickSound();
+    triggerHapticFeedback(30);
     if (!email || !password || (isRegistering && !displayName)) {
       setLocalError('Por favor, completa todos los campos requeridos.');
       return;
@@ -240,6 +245,8 @@ export default function LoginPage({ onLoginSuccess, onEmailLogin, onEmailRegiste
               <button
                 type="button"
                 onClick={() => {
+                  playClickSound();
+                  triggerHapticFeedback(15);
                   clearError();
                   setIsRegistering(!isRegistering);
                 }}
