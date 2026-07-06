@@ -82,15 +82,27 @@ from email.mime.multipart import MIMEMultipart
 
 SENT_REMINDERS = set()  # set of (user_id, match_id) to avoid spamming
 
-def send_reminder_email(to_email: str, display_name: str, match_desc: str, kickoff_str: str):
+def send_reminder_email(to_email: str, display_name: str, match_desc: str, kickoff_str: str, interval: int, has_predicted: bool):
     smtp_host = os.environ.get("SMTP_HOST")
     smtp_port = int(os.environ.get("SMTP_PORT", "587"))
     smtp_user = os.environ.get("SMTP_USERNAME")
     smtp_pass = os.environ.get("SMTP_PASSWORD")
     smtp_from = os.environ.get("SMTP_FROM", smtp_user)
     
-    subject = f"⚽ ¡No olvides tu pronóstico para el partido {match_desc}!"
+    frontend_url = os.environ.get("FRONTEND_URL", "https://mundial-2026-zeta-sand.vercel.app")
     
+    # Format time label
+    time_label = f"{interval} minutos" if interval < 60 else f"{int(interval/60)} hora" if interval == 60 else f"{int(interval/60)} horas"
+    
+    if has_predicted:
+        subject = f"⚽ ¡Faltan {time_label} para el partido {match_desc}!"
+        status_text = "Tu predicción ya está guardada. ¡Prepárate para vivir el partido!"
+        button_text = "Ver Clasificación / Llave"
+    else:
+        subject = f"⚠️ ¡Solo faltan {time_label} para {match_desc}! Ingresa tu pronóstico"
+        status_text = "Aún no has guardado tu predicción para este partido. ¡Ingresa tu marcador ahora para no perder valiosos puntos!"
+        button_text = "Ingresar Pronóstico"
+        
     html = f"""
     <html>
       <body style="font-family: sans-serif; background-color: #05070a; color: #f3f4f6; padding: 20px;">
@@ -98,21 +110,24 @@ def send_reminder_email(to_email: str, display_name: str, match_desc: str, kicko
           <h2 style="color: #e5c158; margin-bottom: 8px;">🏆 Resultados Mundialistas</h2>
           <p style="font-size: 15px; color: #f3f4f6;">Hola <strong>{display_name}</strong>,</p>
           <p style="font-size: 14px; color: #94a3b8; line-height: 1.5;">
-            Te recordamos que el partido <strong>{match_desc}</strong> está por comenzar hoy a las <strong>{kickoff_str} (Hora Colombia)</strong>.
+            Te recordamos que el partido <strong>{match_desc}</strong> comienza en <strong>{time_label}</strong> (a las {kickoff_str} hora Colombia).
           </p>
-          <p style="font-size: 14px; color: #94a3b8; line-height: 1.5; margin-bottom: 24px;">
-            Aún no has guardado tu predicción para este partido. ¡Ingresa ahora y pon tu marcador para no perder valiosos puntos en el ranking!
+          <p style="font-size: 14px; color: #e5c158; font-weight: bold; line-height: 1.5; margin: 16px 0 24px;">
+            {status_text}
           </p>
-          <a href="https://mundial-2026-zeta-sand.vercel.app" style="background-color: #e5c158; color: #05070a; font-weight: bold; text-decoration: none; padding: 12px 24px; border-radius: 8px; display: inline-block; font-size: 14px;">
-            Ingresar Pronóstico
+          <a href="{frontend_url}" style="background-color: #e5c158; color: #05070a; font-weight: bold; text-decoration: none; padding: 12px 24px; border-radius: 8px; display: inline-block; font-size: 14px;">
+            {button_text}
           </a>
+          <p style="font-size: 11px; color: #475569; margin-top: 24px;">
+            Enlace de la app: <a href="{frontend_url}" style="color: #e5c158; text-decoration: underline;">{frontend_url}</a>
+          </p>
         </div>
       </body>
     </html>
     """
     
     if not smtp_host or not smtp_user or not smtp_pass:
-        print(f"[EMAIL MOCK] To: {to_email} | Subject: {subject} | Body: Recordatorio para {match_desc} a las {kickoff_str}")
+        print(f"[EMAIL MOCK] To: {to_email} | Subject: {subject} | Body: {match_desc} in {time_label}. Predicted: {has_predicted}")
         return True
         
     try:
@@ -126,47 +141,60 @@ def send_reminder_email(to_email: str, display_name: str, match_desc: str, kicko
             server.starttls()
             server.login(smtp_user, smtp_pass)
             server.send_message(msg)
-        print(f"[EMAIL SUCCESS] Sent to {to_email} for match {match_desc}")
+        print(f"[EMAIL SUCCESS] Sent to {to_email} for match {match_desc} ({time_label} reminder)")
         return True
     except Exception as e:
         print(f"[EMAIL ERROR] Failed to send to {to_email}: {e}")
         return False
 
 async def send_email_reminders_loop():
-    print("[REMINDERS] Email reminders background loop started.")
+    print("[REMINDERS] Email reminders background loop started (1 minute check interval).")
     while True:
         try:
             db = SessionLocal()
             now = datetime.utcnow()
-            # Matches starting in the next 2 hours
+            # Matches starting in the next 130 minutes (2 hours + buffer)
             upcoming = db.query(models.Match).filter(
                 models.Match.status == "scheduled",
                 models.Match.match_time > now,
-                models.Match.match_time <= now + timedelta(hours=2)
+                models.Match.match_time <= now + timedelta(minutes=130)
             ).all()
             
             if upcoming:
                 users = db.query(models.User).all()
                 for match in upcoming:
                     match_desc = f"{match.home_team} vs {match.away_team}"
-                    # Match time in COT (UTC - 5 hours)
                     cot_time = match.match_time - timedelta(hours=5)
                     kickoff_str = cot_time.strftime("%I:%M %p")
                     
-                    for user in users:
-                        if (user.id, match.id) in SENT_REMINDERS:
-                            continue
-                            
-                        pred = db.query(models.Prediction).filter_by(user_id=user.id, match_id=match.id).first()
-                        if not pred:
-                            if user.email:
-                                send_reminder_email(user.email, user.display_name or "Usuario", match_desc, kickoff_str)
-                                SENT_REMINDERS.add((user.id, match.id))
+                    diff_mins = int((match.match_time - now).total_seconds() / 60)
+                    target_intervals = [120, 60, 30, 15, 10]
+                    
+                    for interval in target_intervals:
+                        # Trigger if remaining minutes are within a 2-minute window of the target interval
+                        if interval - 2 <= diff_mins <= interval:
+                            for user in users:
+                                reminder_key = (user.id, match.id, interval)
+                                if reminder_key in SENT_REMINDERS:
+                                    continue
+                                    
+                                if user.email:
+                                    pred = db.query(models.Prediction).filter_by(user_id=user.id, match_id=match.id).first()
+                                    has_predicted = pred is not None
+                                    send_reminder_email(
+                                        to_email=user.email,
+                                        display_name=user.display_name or "Mundialista",
+                                        match_desc=match_desc,
+                                        kickoff_str=kickoff_str,
+                                        interval=interval,
+                                        has_predicted=has_predicted
+                                    )
+                                    SENT_REMINDERS.add(reminder_key)
             db.close()
         except Exception as e:
             print(f"[REMINDERS ERROR] Error in reminder loop: {e}")
             
-        await asyncio.sleep(1800)  # Check every 30 minutes
+        await asyncio.sleep(60)  # Check every 1 minute to avoid missing intervals
 
 @asynccontextmanager
 async def lifespan(application):

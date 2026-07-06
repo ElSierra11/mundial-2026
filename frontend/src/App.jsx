@@ -222,6 +222,55 @@ export default function App() {
     return () => clearInterval(interval);
   }, []);
 
+  // Client-side notification checks for future matches
+  useEffect(() => {
+    if (!user || typeof Notification === 'undefined' || Notification.permission !== 'granted') return;
+
+    const checkUpcomingMatchNotifications = () => {
+      const now = new Date();
+      const sessionKey = 'sent_local_reminders';
+      const sentReminders = JSON.parse(sessionStorage.getItem(sessionKey) || '{}');
+      
+      matches.forEach(match => {
+        if (match.status !== 'scheduled') return;
+        
+        const matchTime = new Date(match.match_time);
+        const diffMins = Math.floor((matchTime - now) / 60000);
+        
+        const targetIntervals = [120, 60, 30, 15, 10];
+        
+        targetIntervals.forEach(interval => {
+          if (diffMins === interval || (diffMins < interval && diffMins >= interval - 1)) {
+            const key = `${match.id}_${interval}`;
+            if (!sentReminders[key]) {
+              sentReminders[key] = true;
+              sessionStorage.setItem(sessionKey, JSON.stringify(sentReminders));
+              
+              const pred = predictions.find(p => p.match_id === match.id);
+              const title = `⚽ ¡Partido en ${interval} minutos!`;
+              const body = pred
+                ? `Todo listo para el ${match.home_team} vs ${match.away_team}. ¡Tu predicción (${pred.home_prediction} - ${pred.away_prediction}) está guardada!`
+                : `⚠️ Faltan ${interval} min para ${match.home_team} vs ${match.away_team}. ¡Aún no has guardado tu predicción!`;
+                
+              try {
+                new Notification(title, {
+                  body,
+                  icon: '/logo.png'
+                });
+              } catch (e) {
+                console.warn(e);
+              }
+            }
+          }
+        });
+      });
+    };
+
+    checkUpcomingMatchNotifications();
+    const interval = setInterval(checkUpcomingMatchNotifications, 60000);
+    return () => clearInterval(interval);
+  }, [user, matches, predictions]);
+
   const handleLoginSuccess = async (token, _isDemoMode, email, name) => {
     setLoading(true);
     setLoginError('');
