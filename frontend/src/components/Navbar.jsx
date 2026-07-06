@@ -7,10 +7,12 @@ export default function Navbar({ activeTab, setActiveTab, user, onLogout, isDemo
       <header className="hidden md:block w-full sticky top-0 z-50 px-6 py-4 bg-brand-dark/80 backdrop-blur-md border-b border-slate-800">
         <div className="max-w-6xl mx-auto flex items-center justify-between">
           {/* Logo */}
-          <div className="flex items-center gap-2">
-            <div className="p-2 bg-brand-gold/15 rounded-xl border border-brand-gold/20 text-brand-gold">
-              <Trophy className="w-5 h-5" />
-            </div>
+          <div className="flex items-center gap-2.5">
+            <img
+              src="/logo.png"
+              alt="Logo"
+              className="w-9 h-9 rounded-xl object-cover border border-brand-gold/30 shadow-md shadow-brand-gold/5"
+            />
             <span className="font-extrabold text-lg tracking-tight bg-gradient-to-r from-white to-brand-gold bg-clip-text text-transparent">
               RESULTADOS MUNDIALISTAS
             </span>
@@ -142,8 +144,12 @@ export default function Navbar({ activeTab, setActiveTab, user, onLogout, isDemo
 
       {/* Mobile Top Header (Fixed at top for profile context) */}
       <header className="md:hidden w-full flex items-center justify-between px-5 py-3.5 bg-brand-dark/95 backdrop-blur-md border-b border-slate-900 sticky top-0 z-40">
-        <div className="flex items-center gap-1.5">
-          <Trophy className="w-5 h-5 text-brand-gold" />
+        <div className="flex items-center gap-2">
+          <img
+            src="/logo.png"
+            alt="Logo"
+            className="w-7 h-7 rounded-lg object-cover border border-brand-gold/30 shadow-sm"
+          />
           <span className="font-extrabold text-sm tracking-tight bg-gradient-to-r from-white to-brand-gold bg-clip-text text-transparent">RESULTADOS MUNDIALISTAS</span>
           {isDemo && (
             <span className="py-0.5 px-1.5 rounded-full bg-brand-gold/10 border border-brand-gold/20 text-[8px] font-bold text-brand-gold tracking-wide uppercase">

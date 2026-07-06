@@ -137,8 +137,9 @@ export default function LoginPage({ onLoginSuccess, onEmailLogin, onEmailRegiste
                   border: '1.5px solid rgba(229,193,88,0.45)',
                   boxShadow: '0 0 24px rgba(229,193,88,0.2), inset 0 1px 0 rgba(229,193,88,0.1)',
                   display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  overflow: 'hidden'
                 }}>
-                  <Trophy style={{ width: '32px', height: '32px', color: '#e5c158', filter: 'drop-shadow(0 2px 8px rgba(229,193,88,0.5))' }} />
+                  <img src="/logo.png" alt="Logo" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                 </div>
               </div>
             </div>
