@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Award, Flame, Zap, User, Star, Percent, ShieldCheck, HelpCircle, History, Trophy, CheckCircle2, XCircle, Clock } from 'lucide-react';
+import { Award, Flame, Zap, User, Star, Percent, ShieldCheck, HelpCircle, History, Trophy, CheckCircle2, XCircle, Clock, Bell } from 'lucide-react';
 
 const COPA_TEAMS = [
   "Alemania", "Argelia", "Argentina", "Australia", "Austria", "Bélgica", "Bosnia y Herz.", "Brasil", 
@@ -30,6 +30,33 @@ export default function ProfileView({ user, predictions, matches, onUpdateProfil
   const [isEditing, setIsEditing] = useState(false);
   const [displayName, setDisplayName] = useState(user?.display_name || '');
   const [password, setPassword] = useState('');
+  
+  const [notifPermission, setNotifPermission] = useState(
+    typeof Notification !== 'undefined' ? Notification.permission : 'default'
+  );
+
+  const handleToggleNotifications = async () => {
+    if (typeof Notification === 'undefined') {
+      alert("Tu dispositivo o navegador no soporta notificaciones nativas.");
+      return;
+    }
+
+    if (Notification.permission === 'granted') {
+      alert("Las notificaciones ya están activadas en este dispositivo. Para cambiarlas, puedes modificar la configuración en tu navegador.");
+      return;
+    }
+
+    const permission = await Notification.requestPermission();
+    setNotifPermission(permission);
+    if (permission === 'granted') {
+      new Notification("🔔 ¡Alertas Activadas!", {
+        body: "Ya estás listo para recibir notificaciones de goles en vivo del Mundial 2026.",
+        icon: '/logo.png'
+      });
+    } else if (permission === 'denied') {
+      alert("Permiso denegado. Si quieres recibir alertas, por favor habilita los permisos de notificación de la página en tu navegador.");
+    }
+  };
   
   // Extract seed from dicebear url if possible, otherwise fallback to display name
   const getInitialSeed = () => {
@@ -501,6 +528,38 @@ export default function ProfileView({ user, predictions, matches, onUpdateProfil
               </div>
             ))}
           </div>
+        </div>
+      </div>
+
+      {/* 🔔 Ajustes de Notificaciones */}
+      <div className="glass p-6 rounded-3xl border border-slate-800 space-y-4">
+        <div className="flex items-center justify-between">
+          <div>
+            <h3 className="text-sm font-bold text-slate-300 uppercase tracking-wider flex items-center gap-1.5">
+              <Bell className="w-4.5 h-4.5 text-brand-gold animate-pulse" /> Ajustes de Alertas
+            </h3>
+            <p className="text-[10px] text-slate-500 font-medium mt-1">
+              Habilita notificaciones locales en tu teléfono o computadora para goles en vivo y alertas importantes.
+            </p>
+          </div>
+        </div>
+        
+        <div className="flex items-center justify-between p-3.5 rounded-xl bg-slate-950/20 border border-slate-900/60 text-xs">
+          <div className="space-y-0.5 pr-2">
+            <span className="font-bold text-slate-200 block">Notificaciones en Navegador</span>
+            <span className="text-[10px] text-slate-500">Recibe goles del mundial al instante y alertas en segundo plano.</span>
+          </div>
+          
+          <button
+            onClick={handleToggleNotifications}
+            className={`py-2 px-4 rounded-xl text-[10px] font-extrabold uppercase tracking-wider transition-all border shrink-0 ${
+              notifPermission === 'granted'
+                ? 'bg-emerald-500/10 border-emerald-500/40 text-emerald-400 hover:bg-emerald-500/20'
+                : 'bg-brand-gold text-brand-dark hover:bg-amber-400 border-transparent shadow-lg shadow-brand-gold/15'
+            }`}
+          >
+            {notifPermission === 'granted' ? 'Activado ✓' : 'Activar Alertas'}
+          </button>
         </div>
       </div>
 
