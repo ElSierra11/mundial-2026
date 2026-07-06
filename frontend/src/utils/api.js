@@ -140,7 +140,10 @@ export const api = {
   // Check backend availability
   async checkHealth() {
     try {
-      const res = await fetch(`${API_BASE_URL}/api/matches`, { signal: AbortSignal.timeout(1000) });
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 1000);
+      const res = await fetch(`${API_BASE_URL}/api/matches`, { signal: controller.signal });
+      clearTimeout(timeoutId);
       return res.ok;
     } catch {
       return false;

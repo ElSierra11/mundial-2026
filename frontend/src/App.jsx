@@ -44,7 +44,10 @@ function Toast({ toasts, removeToast }) {
 
 const checkInternetConnection = async () => {
   try {
-    await fetch("https://cloudflare.com/cdn-cgi/trace", { mode: 'no-cors', signal: AbortSignal.timeout(1500) });
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 1500);
+    await fetch("https://cloudflare.com/cdn-cgi/trace", { mode: 'no-cors', signal: controller.signal });
+    clearTimeout(timeoutId);
     return true;
   } catch (e) {
     return false;
