@@ -2,14 +2,16 @@ import React, { useState, useEffect, useCallback } from 'react';
 import LoginPage from './components/LoginPage';
 import Navbar from './components/Navbar';
 import MatchCard from './components/MatchCard';
-import Leaderboard from './components/Leaderboard';
-import AdminPanel from './components/AdminPanel';
-import BracketView from './components/BracketView';
-import GroupsView from './components/GroupsView';
-import ChatView from './components/ChatView';
-import ProfileView from './components/ProfileView';
 import ChampionPoll from './components/ChampionPoll';
-import OfflineGame from './components/OfflineGame';
+
+const Leaderboard = React.lazy(() => import('./components/Leaderboard'));
+const AdminPanel = React.lazy(() => import('./components/AdminPanel'));
+const BracketView = React.lazy(() => import('./components/BracketView'));
+const GroupsView = React.lazy(() => import('./components/GroupsView'));
+const ChatView = React.lazy(() => import('./components/ChatView'));
+const ProfileView = React.lazy(() => import('./components/ProfileView'));
+const OfflineGame = React.lazy(() => import('./components/OfflineGame'));
+
 import { api } from './utils/api';
 import { fetchLiveWorldCupScores, mergeLiveData } from './utils/liveApi';
 import { Sparkles, Radio, Database, AlertCircle, Calendar, Wifi, WifiOff, CheckCircle2, XCircle, Info } from 'lucide-react';
@@ -95,22 +97,31 @@ export default function App() {
     };
   }, []);
 
-  // Check if user is already logged in & check backend health
+  // Check user session, backend health, and internet connectivity on mount
   useEffect(() => {
-    const checkStatus = async () => {
-      // Always use server/real mode
-      api.setMode('real');
+    // Always use server/real mode
+    api.setMode('real');
 
-      const loggedUser = api.getCurrentUser();
-      if (loggedUser) {
-        setUser(loggedUser);
-      }
+    const loggedUser = api.getCurrentUser();
+    if (loggedUser) {
+      setUser(loggedUser);
+    }
 
-      // Check if python backend is online
+    const checkConnection = async () => {
       const online = await api.checkHealth();
       setBackendOnline(online);
+      
+      if (!online) {
+        const hasInternet = await checkInternetConnection();
+        setIsOnline(hasInternet);
+      } else {
+        setIsOnline(true);
+      }
     };
-    checkStatus();
+    
+    checkConnection();
+    const interval = setInterval(checkConnection, 15000);
+    return () => clearInterval(interval);
   }, []);
 
   // Fetch data whenever user or isDemo changes
@@ -206,24 +217,7 @@ export default function App() {
     return () => clearInterval(interval);
   }, [syncLiveScores]);
 
-  // Periodically check if backend status changes and check internet connectivity
-  useEffect(() => {
-    const checkConnection = async () => {
-      const online = await api.checkHealth();
-      setBackendOnline(online);
-      
-      if (!online) {
-        const hasInternet = await checkInternetConnection();
-        setIsOnline(hasInternet);
-      } else {
-        setIsOnline(true);
-      }
-    };
-    
-    checkConnection();
-    const interval = setInterval(checkConnection, 15000);
-    return () => clearInterval(interval);
-  }, []);
+  // Periodically check connection and backend state handled in mount effect
 
   // Client-side notification checks for future matches
   useEffect(() => {
@@ -393,10 +387,17 @@ export default function App() {
   if (!isOnline) {
     return (
       <div className="min-h-screen bg-stadium-gradient pb-10 flex items-center justify-center px-4 py-12">
-        <OfflineGame onRetryConnection={async () => {
-          const hasInternet = await checkInternetConnection();
-          setIsOnline(hasInternet);
-        }} />
+        <React.Suspense fallback={
+          <div className="flex flex-col items-center justify-center py-20 gap-4">
+            <div className="w-10 h-10 border-4 border-brand-accent border-t-transparent rounded-full animate-spin"></div>
+            <p className="text-sm font-semibold text-slate-400">Cargando juego...</p>
+          </div>
+        }>
+          <OfflineGame onRetryConnection={async () => {
+            const hasInternet = await checkInternetConnection();
+            setIsOnline(hasInternet);
+          }} />
+        </React.Suspense>
       </div>
     );
   }
@@ -453,7 +454,13 @@ export default function App() {
             <p className="text-sm font-semibold text-slate-400">Cargando datos de la polla...</p>
           </div>
         ) : (
-          <div className="space-y-6">
+          <React.Suspense fallback={
+            <div className="flex flex-col items-center justify-center py-20 gap-4">
+              <div className="w-10 h-10 border-4 border-brand-accent border-t-transparent rounded-full animate-spin"></div>
+              <p className="text-sm font-semibold text-slate-400">Cargando pestaña...</p>
+            </div>
+          }>
+            <div className="space-y-6">
             
             {/* Matches Tab */}
             {activeTab === 'matches' && (
@@ -591,6 +598,7 @@ export default function App() {
               />
             )}
           </div>
+          </React.Suspense>
         )}
       </main>
     </div>

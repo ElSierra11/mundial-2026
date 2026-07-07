@@ -35,16 +35,24 @@ self.addEventListener('activate', (event) => {
 
 // Fetch event: respond with network-first for navigation, stale-while-revalidate for assets
 self.addEventListener('fetch', (event) => {
-  if (event.request.method !== 'GET' || !event.request.url.startsWith(self.location.origin)) {
+  const url = event.request.url;
+  const isSelfOrigin = url.startsWith(self.location.origin);
+  const isAllowedExternal = url.includes('flagcdn.com') || url.includes('api.dicebear.com');
+  
+  if (event.request.method !== 'GET' || (!isSelfOrigin && !isAllowedExternal)) {
     return;
   }
   
-  const isNavigation = event.request.mode === 'navigate' || event.request.url.endsWith('/') || event.request.url.endsWith('index.html');
+  const isNavigation = event.request.mode === 'navigate' || url.endsWith('/') || url.endsWith('index.html');
+  
+  const isCacheableResponse = (response) => {
+    return response && (response.status === 200 || (response.status === 0 && response.type === 'opaque'));
+  };
   
   if (isNavigation) {
     event.respondWith(
       fetch(event.request).then((networkResponse) => {
-        if (networkResponse && networkResponse.status === 200) {
+        if (isCacheableResponse(networkResponse)) {
           const responseToCache = networkResponse.clone();
           caches.open(CACHE_NAME).then((cache) => {
             cache.put(event.request, responseToCache);
@@ -63,7 +71,7 @@ self.addEventListener('fetch', (event) => {
       if (cachedResponse) {
         // Fetch in background to update cache for next time
         fetch(event.request).then((networkResponse) => {
-          if (networkResponse && networkResponse.status === 200) {
+          if (isCacheableResponse(networkResponse)) {
             caches.open(CACHE_NAME).then((cache) => {
               cache.put(event.request, networkResponse);
             });
@@ -74,7 +82,7 @@ self.addEventListener('fetch', (event) => {
       }
       
       return fetch(event.request).then((networkResponse) => {
-        if (!networkResponse || networkResponse.status !== 200) {
+        if (!isCacheableResponse(networkResponse)) {
           return networkResponse;
         }
         
