@@ -11,128 +11,60 @@ export default function Navbar({ activeTab, setActiveTab, user, onLogout, isDemo
   return (
     <>
       {/* Desktop Header Navbar */}
-      <header className="hidden md:block w-full sticky top-0 z-50 px-6 py-4 bg-brand-dark/80 backdrop-blur-md border-b border-slate-800">
-        <div className="max-w-6xl mx-auto flex items-center justify-between">
+      <header className="hidden md:block w-full sticky top-0 z-50 px-4 py-4 bg-brand-dark/80 backdrop-blur-md border-b border-slate-800">
+        <div className="max-w-7xl mx-auto flex items-center justify-between gap-4">
           {/* Logo */}
-          <div className="flex items-center gap-2.5">
+          <div className="flex items-center gap-2 shrink-0">
             <img
               src="/logo.png"
               alt="Logo"
               className="w-9 h-9 rounded-xl object-cover border border-brand-gold/30 shadow-md shadow-brand-gold/5"
             />
-            <span className="font-extrabold text-lg tracking-tight bg-gradient-to-r from-white to-brand-gold bg-clip-text text-transparent">
+            <span className="font-extrabold text-sm xl:text-lg tracking-tight bg-gradient-to-r from-white to-brand-gold bg-clip-text text-transparent hidden lg:inline-block">
               RESULTADOS MUNDIALISTAS
             </span>
             {isDemo && (
-              <span className="ml-2 py-0.5 px-2 rounded-full bg-brand-accent/10 border border-brand-accent/30 text-[10px] font-bold text-brand-accent tracking-wider uppercase">
+              <span className="ml-1.5 py-0.5 px-2 rounded-full bg-brand-accent/10 border border-brand-accent/30 text-[10px] font-bold text-brand-accent tracking-wider uppercase">
                 Demo
               </span>
             )}
           </div>
 
           {/* Navigation Links */}
-          <nav className="flex items-center gap-2 bg-slate-950/40 p-1.5 rounded-2xl border border-slate-800/80">
-            <button
-              onClick={() => handleTabClick('bracket')}
-              className={`flex items-center gap-2 py-2 px-4 rounded-xl text-sm font-semibold transition-all ${
-                activeTab === 'bracket'
-                  ? 'bg-brand-gold text-brand-dark shadow-lg shadow-brand-gold/15'
-                  : 'text-slate-400 hover:text-slate-200'
-              }`}
-            >
-              <GitBranch className="w-4 h-4" />
-              <span>Llave</span>
-            </button>
-
-            <button
-              onClick={() => handleTabClick('matches')}
-              className={`flex items-center gap-2 py-2 px-4 rounded-xl text-sm font-semibold transition-all ${
-                activeTab === 'matches'
-                  ? 'bg-brand-gold text-brand-dark shadow-lg shadow-brand-gold/15'
-                  : 'text-slate-400 hover:text-slate-200'
-              }`}
-            >
-              <Calendar className="w-4 h-4" />
-              <span>Partidos</span>
-            </button>
-
-            <button
-              onClick={() => handleTabClick('leaderboard')}
-              className={`flex items-center gap-2 py-2 px-4 rounded-xl text-sm font-semibold transition-all ${
-                activeTab === 'leaderboard'
-                  ? 'bg-brand-gold text-brand-dark shadow-lg shadow-brand-gold/15'
-                  : 'text-slate-400 hover:text-slate-200'
-              }`}
-            >
-              <Trophy className="w-4 h-4" />
-              <span>Ranking</span>
-            </button>
-
-            <button
-              onClick={() => handleTabClick('chat')}
-              className={`flex items-center gap-2 py-2 px-4 rounded-xl text-sm font-semibold transition-all ${
-                activeTab === 'chat'
-                  ? 'bg-brand-gold text-brand-dark shadow-lg shadow-brand-gold/15'
-                  : 'text-slate-400 hover:text-slate-200'
-              }`}
-            >
-              <MessageSquare className="w-4 h-4" />
-              <span>Chat</span>
-            </button>
-
-            <button
-              onClick={() => handleTabClick('groups')}
-              className={`flex items-center gap-2 py-2 px-4 rounded-xl text-sm font-semibold transition-all ${
-                activeTab === 'groups'
-                  ? 'bg-brand-gold text-brand-dark shadow-lg shadow-brand-gold/15'
-                  : 'text-slate-400 hover:text-slate-200'
-              }`}
-            >
-              <Users className="w-4 h-4" />
-              <span>Grupos</span>
-            </button>
-
-            <button
-              onClick={() => handleTabClick('trivia')}
-              className={`flex items-center gap-2 py-2 px-4 rounded-xl text-sm font-semibold transition-all ${
-                activeTab === 'trivia'
-                  ? 'bg-brand-gold text-brand-dark shadow-lg shadow-brand-gold/15'
-                  : 'text-slate-400 hover:text-slate-200'
-              }`}
-            >
-              <HelpCircle className="w-4 h-4" />
-              <span>Trivia</span>
-            </button>
-
-            <button
-              onClick={() => handleTabClick('profile')}
-              className={`flex items-center gap-2 py-2 px-4 rounded-xl text-sm font-semibold transition-all ${
-                activeTab === 'profile'
-                  ? 'bg-brand-gold text-brand-dark shadow-lg shadow-brand-gold/15'
-                  : 'text-slate-400 hover:text-slate-200'
-              }`}
-            >
-              <User className="w-4 h-4" />
-              <span>Perfil</span>
-            </button>
-
-            {user?.is_admin && (
-              <button
-                onClick={() => handleTabClick('admin')}
-                className={`flex items-center gap-2 py-2 px-4 rounded-xl text-sm font-semibold transition-all ${
-                  activeTab === 'admin'
-                    ? 'bg-brand-purple text-white shadow-lg shadow-brand-purple/20'
-                    : 'text-slate-400 hover:text-slate-200'
-                }`}
-              >
-                <ShieldCheck className="w-4 h-4" />
-                <span>Admin</span>
-              </button>
-            )}
+          <nav className="flex items-center gap-1 xl:gap-2 bg-slate-950/40 p-1 lg:p-1.5 rounded-2xl border border-slate-800/80">
+            {[
+              { id: 'bracket',     icon: <GitBranch className="w-4 h-4" />,     label: 'Llave'    },
+              { id: 'matches',     icon: <Calendar className="w-4 h-4" />,      label: 'Partidos' },
+              { id: 'leaderboard', icon: <Trophy className="w-4 h-4" />,        label: 'Ranking'  },
+              { id: 'chat',        icon: <MessageSquare className="w-4 h-4" />, label: 'Chat'     },
+              { id: 'groups',      icon: <Users className="w-4 h-4" />,         label: 'Grupos'   },
+              { id: 'trivia',      icon: <HelpCircle className="w-4 h-4" />,    label: 'Trivia'   },
+              { id: 'profile',     icon: <User className="w-4 h-4" />,          label: 'Perfil'   },
+              ...(user?.is_admin ? [{ id: 'admin', icon: <ShieldCheck className="w-4 h-4" />, label: 'Admin' }] : [])
+            ].map(tab => {
+              const isActive = activeTab === tab.id;
+              const activeStyle = tab.id === 'admin' 
+                ? 'bg-brand-purple text-white shadow-lg shadow-brand-purple/20' 
+                : 'bg-brand-gold text-brand-dark shadow-lg shadow-brand-gold/15';
+              const inactiveStyle = 'text-slate-400 hover:text-slate-200';
+              
+              return (
+                <button
+                  key={tab.id}
+                  onClick={() => handleTabClick(tab.id)}
+                  className={`flex items-center gap-1 lg:gap-2 py-1.5 px-2.5 xl:px-4 rounded-xl text-xs xl:text-sm font-semibold transition-all ${
+                    isActive ? activeStyle : inactiveStyle
+                  }`}
+                >
+                  {tab.icon}
+                  <span>{tab.label}</span>
+                </button>
+              );
+            })}
           </nav>
 
           {/* User Profile & Logout */}
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2 xl:gap-3 shrink-0">
             {/* TTS volume toggle */}
             <button
               onClick={() => {
@@ -150,19 +82,24 @@ export default function Navbar({ activeTab, setActiveTab, user, onLogout, isDemo
               {isTtsEnabled ? <Volume2 className="w-4 h-4" /> : <VolumeX className="w-4 h-4" />}
             </button>
 
-            <div className="flex items-center gap-3 bg-slate-900/40 py-1.5 pl-3 pr-4 rounded-2xl border border-slate-800">
+            <div className="flex items-center gap-2 xl:gap-3 bg-slate-900/40 py-1.5 pl-2 pr-3 xl:pl-3 xl:pr-4 rounded-2xl border border-slate-800">
               <img
                 src={user?.avatar_url || 'https://api.dicebear.com/7.x/adventurer/svg?seed=guest'}
                 alt={user?.display_name}
                 className="w-8 h-8 rounded-full border border-slate-700 bg-slate-800"
               />
-              <div className="text-left">
+              <div className="text-left hidden xl:block">
                 <p className="text-xs font-semibold text-slate-300 max-w-[100px] truncate">
                   {user?.display_name}
                 </p>
                 <p className="text-[11px] font-bold text-brand-gold flex items-center gap-0.5 leading-none">
                   <Sparkles className="w-3 h-3 fill-brand-gold/20" />
                   <span>{user?.points || 0} Pts</span>
+                </p>
+              </div>
+              <div className="xl:hidden text-center min-w-[32px]">
+                <p className="text-[11px] font-bold text-brand-gold leading-none">
+                  {user?.points || 0} Pts
                 </p>
               </div>
             </div>

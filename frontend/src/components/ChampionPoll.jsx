@@ -88,11 +88,11 @@ export default function ChampionPoll() {
   const maxVotes = results[0]?.votes || 1;
 
   return (
-    <div className="glass rounded-3xl border border-slate-800 overflow-hidden shadow-2xl">
+    <div className="glass rounded-3xl border border-slate-800 shadow-2xl relative">
       {/* Header */}
       <button
         onClick={() => setExpanded(v => !v)}
-        className="w-full flex items-center justify-between px-6 py-5 bg-gradient-to-r from-brand-gold/5 to-transparent hover:from-brand-gold/10 transition-all"
+        className="w-full flex items-center justify-between px-6 py-5 bg-gradient-to-r from-brand-gold/5 to-transparent hover:from-brand-gold/10 transition-all rounded-t-3xl"
       >
         <div className="flex items-center gap-3">
           <div className="p-2.5 bg-brand-gold/15 rounded-xl border border-brand-gold/25 text-brand-gold">
