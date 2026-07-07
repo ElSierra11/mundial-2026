@@ -67,6 +67,8 @@ export default function App() {
   const [loading, setLoading] = useState(false);
   const [backendOnline, setBackendOnline] = useState(false);
   const [backendError, setBackendError] = useState(false);
+  const [serverWarmingUp, setServerWarmingUp] = useState(false);
+  const [warmupSecondsLeft, setWarmupSecondsLeft] = useState(65);
   const [isDemo, setIsDemo] = useState(api.getMode() === 'demo');
   const [loginError, setLoginError] = useState('');
 
@@ -144,8 +146,47 @@ export default function App() {
   // Fetch data whenever user or isDemo changes
   const loadAppData = async () => {
     if (!user) return;
-    setLoading(true);
     setBackendError(false);
+    setServerWarmingUp(false);
+
+    // In demo mode, load instantly from localStorage
+    if (api.getMode() === 'demo') {
+      setLoading(true);
+      try {
+        setMatches(await api.getMatches());
+        setLeaderboard(await api.getLeaderboard());
+        setPredictions(await api.getPredictions());
+      } catch (err) {
+        console.error('Demo load error:', err);
+      } finally {
+        setLoading(false);
+      }
+      return;
+    }
+
+    // Real mode: quick health check first (3s)
+    setLoading(true);
+    const isHealthy = await api.checkHealth();
+    setLoading(false);
+
+    if (!isHealthy) {
+      // Server might be sleeping (Render free tier) — wait up to 65s for cold start
+      setServerWarmingUp(true);
+      setWarmupSecondsLeft(65);
+      const awoke = await api.wakeUpServer((secsLeft) => setWarmupSecondsLeft(secsLeft));
+      setServerWarmingUp(false);
+
+      if (!awoke) {
+        setBackendError(true);
+        return;
+      }
+      // Server is now awake — update status
+      setBackendOnline(true);
+      setIsOnline(true);
+    }
+
+    // Load data now that the server is online
+    setLoading(true);
     try {
       const allMatches = await api.getMatches();
       setMatches(allMatches);
@@ -156,11 +197,8 @@ export default function App() {
       const preds = await api.getPredictions();
       setPredictions(preds);
     } catch (err) {
-      console.error("Error loading application data:", err);
-      // Only show error panel in real mode — demo mode should never fail
-      if (api.getMode() !== 'demo') {
-        setBackendError(true);
-      }
+      console.error('Error loading application data:', err);
+      setBackendError(true);
     } finally {
       setLoading(false);
     }
@@ -500,6 +538,51 @@ export default function App() {
           <div className="flex flex-col items-center justify-center py-20 gap-4">
             <div className="w-10 h-10 border-4 border-brand-accent border-t-transparent rounded-full animate-spin"></div>
             <p className="text-sm font-semibold text-slate-400">Cargando datos de la polla...</p>
+          </div>
+        ) : serverWarmingUp ? (
+          <div className="flex flex-col items-center justify-center py-24 gap-6 text-center px-4">
+            {/* Animated server icon */}
+            <div className="relative">
+              <div className="w-20 h-20 rounded-2xl bg-brand-gold/10 border border-brand-gold/25 flex items-center justify-center">
+                <Sparkles className="w-9 h-9 text-brand-gold animate-pulse" />
+              </div>
+              {/* Pulsing ring */}
+              <div className="absolute inset-0 rounded-2xl border-2 border-brand-gold/30 animate-ping"></div>
+            </div>
+            <div className="space-y-2">
+              <h2 className="text-lg font-extrabold text-white">Despertando el servidor...</h2>
+              <p className="text-sm text-slate-400 max-w-sm">
+                El servidor está iniciando (instancia gratuita en Render).
+                Esto puede tomar hasta 60 segundos la primera vez.
+              </p>
+            </div>
+            {/* Countdown ring */}
+            <div className="flex flex-col items-center gap-2">
+              <div className="relative w-20 h-20">
+                <svg className="w-20 h-20 -rotate-90" viewBox="0 0 80 80">
+                  <circle cx="40" cy="40" r="34" fill="none" stroke="#1e293b" strokeWidth="6" />
+                  <circle
+                    cx="40" cy="40" r="34" fill="none"
+                    stroke="#f59e0b" strokeWidth="6"
+                    strokeLinecap="round"
+                    strokeDasharray={`${2 * Math.PI * 34}`}
+                    strokeDashoffset={`${2 * Math.PI * 34 * (1 - warmupSecondsLeft / 65)}`}
+                    style={{ transition: 'stroke-dashoffset 1s linear' }}
+                  />
+                </svg>
+                <span className="absolute inset-0 flex items-center justify-center text-xl font-extrabold text-brand-gold">
+                  {warmupSecondsLeft}
+                </span>
+              </div>
+              <p className="text-xs text-slate-500">segundos restantes</p>
+            </div>
+            <button
+              onClick={() => { api.setMode('demo'); setIsDemo(true); handleLogout(); }}
+              className="flex items-center gap-2 py-2.5 px-5 rounded-xl bg-slate-900 border border-slate-700 text-slate-300 font-semibold text-sm hover:bg-slate-800 transition-all"
+            >
+              <Sparkles className="w-4 h-4 text-brand-gold" />
+              No esperar — usar Modo Demo
+            </button>
           </div>
         ) : backendError ? (
           <div className="flex flex-col items-center justify-center py-24 gap-6 text-center px-4">

@@ -158,6 +158,39 @@ export const api = {
     }
   },
 
+  // Wake up a sleeping Render free-tier instance (cold start can take up to 60s)
+  async wakeUpServer(onTick) {
+    return new Promise((resolve) => {
+      let elapsed = 0;
+      const maxWait = 65000; // 65 seconds max
+      const tickInterval = 1000; // update every second
+      
+      const controller = new AbortController();
+
+      // Start the fetch with a long timeout
+      fetch(`${API_BASE_URL}/api/health`, { signal: controller.signal })
+        .then(res => { 
+          clearInterval(ticker);
+          resolve(res.ok);
+        })
+        .catch(() => {
+          clearInterval(ticker);
+          resolve(false);
+        });
+
+      // Tick every second to update countdown
+      const ticker = setInterval(() => {
+        elapsed += tickInterval;
+        if (onTick) onTick(Math.round((maxWait - elapsed) / 1000));
+        if (elapsed >= maxWait) {
+          clearInterval(ticker);
+          controller.abort();
+          resolve(false);
+        }
+      }, tickInterval);
+    });
+  },
+
   // Auth Operations
   async loginWithGoogle(token, isDemo = false, demoEmail = "", demoName = "") {
     if (isDemo) {
