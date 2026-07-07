@@ -12,6 +12,14 @@ const getHeaders = () => {
   };
 };
 
+// Fetch helper with timeout to prevent infinite hangs when backend is unreachable
+const fetchWithTimeout = (url, options = {}, timeoutMs = 6000) => {
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+  return fetch(url, { ...options, signal: controller.signal })
+    .finally(() => clearTimeout(timeoutId));
+};
+
 // Seed mock data for Demo Mode
 const initialDemoMatches = [
   // Ronda de 32 (Dieciseisavos)
@@ -253,7 +261,7 @@ export const api = {
       return JSON.parse(localStorage.getItem("demo_matches"));
     }
 
-    const response = await fetch(`${API_BASE_URL}/api/matches`, { headers: getHeaders() });
+    const response = await fetchWithTimeout(`${API_BASE_URL}/api/matches`, { headers: getHeaders() });
     if (!response.ok) throw new Error("Error al obtener los partidos");
     return await response.json();
   },
@@ -267,7 +275,7 @@ export const api = {
       return allPreds.filter(p => p.user_id === user.id);
     }
 
-    const response = await fetch(`${API_BASE_URL}/api/predictions`, { headers: getHeaders() });
+    const response = await fetchWithTimeout(`${API_BASE_URL}/api/predictions`, { headers: getHeaders() });
     if (!response.ok) throw new Error("Error al obtener predicciones");
     return await response.json();
   },
@@ -339,7 +347,7 @@ export const api = {
       });
     }
 
-    const response = await fetch(`${API_BASE_URL}/api/users/leaderboard`, { headers: getHeaders() });
+    const response = await fetchWithTimeout(`${API_BASE_URL}/api/users/leaderboard`, { headers: getHeaders() });
     if (!response.ok) throw new Error("Error al obtener el leaderboard");
     return await response.json();
   },

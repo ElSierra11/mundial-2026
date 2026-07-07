@@ -66,6 +66,7 @@ export default function App() {
   const [leaderboard, setLeaderboard] = useState([]);
   const [loading, setLoading] = useState(false);
   const [backendOnline, setBackendOnline] = useState(false);
+  const [backendError, setBackendError] = useState(false);
   const [isDemo, setIsDemo] = useState(api.getMode() === 'demo');
   const [loginError, setLoginError] = useState('');
 
@@ -144,6 +145,7 @@ export default function App() {
   const loadAppData = async () => {
     if (!user) return;
     setLoading(true);
+    setBackendError(false);
     try {
       const allMatches = await api.getMatches();
       setMatches(allMatches);
@@ -155,6 +157,10 @@ export default function App() {
       setPredictions(preds);
     } catch (err) {
       console.error("Error loading application data:", err);
+      // Only show error panel in real mode — demo mode should never fail
+      if (api.getMode() !== 'demo') {
+        setBackendError(true);
+      }
     } finally {
       setLoading(false);
     }
@@ -494,6 +500,34 @@ export default function App() {
           <div className="flex flex-col items-center justify-center py-20 gap-4">
             <div className="w-10 h-10 border-4 border-brand-accent border-t-transparent rounded-full animate-spin"></div>
             <p className="text-sm font-semibold text-slate-400">Cargando datos de la polla...</p>
+          </div>
+        ) : backendError ? (
+          <div className="flex flex-col items-center justify-center py-24 gap-6 text-center px-4">
+            <div className="w-16 h-16 rounded-2xl bg-red-500/10 border border-red-500/20 flex items-center justify-center">
+              <AlertCircle className="w-8 h-8 text-red-400" />
+            </div>
+            <div className="space-y-2">
+              <h2 className="text-lg font-extrabold text-white">Servidor desconectado</h2>
+              <p className="text-sm text-slate-400 max-w-sm">
+                No se pudo conectar con el servidor. Verifica que el backend esté en línea o cambia a Modo Demo para continuar con datos locales.
+              </p>
+            </div>
+            <div className="flex flex-col sm:flex-row gap-3">
+              <button
+                onClick={loadAppData}
+                className="flex items-center gap-2 py-2.5 px-5 rounded-xl bg-brand-accent text-brand-dark font-bold text-sm hover:opacity-90 transition-all"
+              >
+                <Radio className="w-4 h-4" />
+                Reintentar conexión
+              </button>
+              <button
+                onClick={() => { api.setMode('demo'); setIsDemo(true); handleLogout(); }}
+                className="flex items-center gap-2 py-2.5 px-5 rounded-xl bg-slate-900 border border-slate-700 text-slate-300 font-bold text-sm hover:bg-slate-800 transition-all"
+              >
+                <Sparkles className="w-4 h-4 text-brand-gold" />
+                Cambiar a Modo Demo
+              </button>
+            </div>
           </div>
         ) : (
           <React.Suspense fallback={
