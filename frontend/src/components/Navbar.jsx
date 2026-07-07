@@ -1,4 +1,4 @@
-import { Trophy, Calendar, ShieldCheck, LogOut, Sparkles, GitBranch, MessageSquare, User, Users, Volume2, VolumeX } from 'lucide-react';
+import { Trophy, Calendar, ShieldCheck, LogOut, Sparkles, GitBranch, MessageSquare, User, Users, Volume2, VolumeX, HelpCircle } from 'lucide-react';
 import { playClickSound, triggerHapticFeedback } from '../utils/soundEffects';
 
 export default function Navbar({ activeTab, setActiveTab, user, onLogout, isDemo, isTtsEnabled, toggleTts }) {
