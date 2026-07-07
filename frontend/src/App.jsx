@@ -118,9 +118,6 @@ export default function App() {
 
   // Check user session, backend health, and internet connectivity on mount
   useEffect(() => {
-    // Always use server/real mode
-    api.setMode('real');
-
     const loggedUser = api.getCurrentUser();
     if (loggedUser) {
       setUser(loggedUser);
