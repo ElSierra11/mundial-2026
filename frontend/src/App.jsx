@@ -11,6 +11,7 @@ const GroupsView = React.lazy(() => import('./components/GroupsView'));
 const ChatView = React.lazy(() => import('./components/ChatView'));
 const ProfileView = React.lazy(() => import('./components/ProfileView'));
 const OfflineGame = React.lazy(() => import('./components/OfflineGame'));
+const DailyTrivia = React.lazy(() => import('./components/DailyTrivia'));
 
 import { api } from './utils/api';
 import { fetchLiveWorldCupScores, mergeLiveData } from './utils/liveApi';
@@ -67,6 +68,24 @@ export default function App() {
   const [backendOnline, setBackendOnline] = useState(false);
   const [isDemo, setIsDemo] = useState(api.getMode() === 'demo');
   const [loginError, setLoginError] = useState('');
+
+  // Local state for SpeechSynthesis (TTS) Goal Narrator
+  const [isTtsEnabled, setIsTtsEnabled] = useState(() => {
+    try {
+      const cached = localStorage.getItem('is_tts_enabled');
+      return cached !== null ? JSON.parse(cached) : true;
+    } catch {
+      return true;
+    }
+  });
+
+  const toggleTts = () => {
+    setIsTtsEnabled(prev => {
+      const newVal = !prev;
+      localStorage.setItem('is_tts_enabled', JSON.stringify(newVal));
+      return newVal;
+    });
+  };
 
   // Toast notifications
   const [toasts, setToasts] = useState([]);
@@ -187,6 +206,30 @@ export default function App() {
         body: `¡Gol de ${scoringTeam}! Marcador actual: ${homeScore} - ${awayScore}`,
         icon: '/logo.png'
       });
+
+      // TTS Live Goal Commentary
+      if (isTtsEnabled && 'speechSynthesis' in window) {
+        window.speechSynthesis.cancel(); // Abort previous queue
+        const templates = [
+          `¡Goooooool de ${scoringTeam}!`,
+          `¡Increíble gol de la selección de ${scoringTeam}!`,
+          `¡Anotación para ${scoringTeam}!`,
+          `¡Siiii, goool de ${scoringTeam}!`
+        ];
+        const phrase = templates[Math.floor(Math.random() * templates.length)];
+        const text = `${phrase} El marcador se mueve: ${scoringTeam} ${homeScore}, ${opposingTeam} ${awayScore}. ¡Tiembla el ranking general!`;
+        
+        const utterance = new SpeechSynthesisUtterance(text);
+        utterance.lang = 'es-MX';
+        utterance.rate = 1.05;
+        utterance.pitch = 1.15;
+        
+        const voices = window.speechSynthesis.getVoices();
+        const voice = voices.find(v => v.lang.startsWith('es'));
+        if (voice) utterance.voice = voice;
+        
+        window.speechSynthesis.speak(utterance);
+      }
     } catch (e) {
       console.warn("Could not fire notification:", e);
     }
@@ -444,6 +487,8 @@ export default function App() {
         user={user} 
         onLogout={handleLogout} 
         isDemo={false}
+        isTtsEnabled={isTtsEnabled}
+        toggleTts={toggleTts}
       />
 
       {/* Content wrapper */}
@@ -573,6 +618,23 @@ export default function App() {
             {/* Chat Tab */}
             {activeTab === 'chat' && (
               <ChatView user={user} isDemo={isDemo} leaderboard={leaderboard} />
+            )}
+
+            {/* Daily Trivia Tab */}
+            {activeTab === 'trivia' && (
+              <DailyTrivia 
+                user={user} 
+                isDemo={isDemo} 
+                showToast={showToast}
+                onUpdateProfile={async (data) => {
+                  if (isDemo) {
+                    setUser(data);
+                  } else {
+                    const updated = await api.updateUserProfile(data);
+                    setUser(updated);
+                  }
+                }}
+              />
             )}
 
             {/* Profile Tab */}

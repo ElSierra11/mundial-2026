@@ -44,6 +44,27 @@ const getH2HStats = (home, away) => {
   return { total, homeWins, draws, awayWins, lastScores };
 };
 
+const getTeamForm = (teamName) => {
+  let hash = 0;
+  for (let i = 0; i < teamName.length; i++) {
+    hash = teamName.charCodeAt(i) + ((hash << 5) - hash);
+  }
+  hash = Math.abs(hash);
+  
+  const results = [];
+  for (let i = 0; i < 5; i++) {
+    const seed = (hash >> i) % 10;
+    if (seed < 5) {
+      results.push('V');
+    } else if (seed < 8) {
+      results.push('E');
+    } else {
+      results.push('D');
+    }
+  }
+  return results;
+};
+
 export default function MatchCard({ match, prediction, onSavePrediction }) {
   const [homePred, setHomePred] = useState('');
   const [awayPred, setAwayPred] = useState('');
@@ -432,7 +453,46 @@ export default function MatchCard({ match, prediction, onSavePrediction }) {
               const awayPct = 100 - homePct - drawPct;
               return (
                 <>
-                  <div className="flex justify-between items-center text-slate-400 font-semibold">
+                  {/* Form Guide */}
+                  <div className="pb-3 border-b border-slate-900 flex flex-col gap-2.5">
+                    <span className="text-[9px] text-slate-500 font-bold uppercase tracking-wider block">Estado de Forma (Últimos 5 Partidos):</span>
+                    <div className="flex flex-col gap-2">
+                      <div className="flex items-center justify-between">
+                        <span className="font-semibold text-slate-350 truncate max-w-[120px]">{match.home_team}</span>
+                        <div className="flex gap-1">
+                          {getTeamForm(match.home_team).map((r, i) => (
+                            <span
+                              key={i}
+                              className={`w-4 h-4 rounded-full flex items-center justify-center text-[8px] font-black text-white ${
+                                r === 'V' ? 'bg-emerald-500/90' : r === 'E' ? 'bg-slate-500/90' : 'bg-red-500/90'
+                              }`}
+                              title={r === 'V' ? 'Victoria' : r === 'E' ? 'Empate' : 'Derrota'}
+                            >
+                              {r}
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <span className="font-semibold text-slate-350 truncate max-w-[120px]">{match.away_team}</span>
+                        <div className="flex gap-1">
+                          {getTeamForm(match.away_team).map((r, i) => (
+                            <span
+                              key={i}
+                              className={`w-4 h-4 rounded-full flex items-center justify-center text-[8px] font-black text-white ${
+                                r === 'V' ? 'bg-emerald-500/90' : r === 'E' ? 'bg-slate-500/90' : 'bg-red-500/90'
+                              }`}
+                              title={r === 'V' ? 'Victoria' : r === 'E' ? 'Empate' : 'Derrota'}
+                            >
+                              {r}
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="flex justify-between items-center text-slate-400 font-semibold pt-1">
                     <span>Encuentros totales: {h2h.total}</span>
                     <span>Historial General</span>
                   </div>

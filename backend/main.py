@@ -5,6 +5,17 @@ import auth
 import live_sync
 import asyncio
 import os
+# Load local .env file manually on startup if present
+if os.path.exists(".env"):
+    print("[BACKEND] Loading environment variables from .env file...")
+    with open(".env", "r", encoding="utf-8") as f:
+        for line in f:
+            line = line.strip()
+            if not line or line.startswith("#"):
+                continue
+            if "=" in line:
+                key, val = line.split("=", 1)
+                os.environ[key.strip()] = val.strip()
 from contextlib import asynccontextmanager
 from database import SessionLocal, engine, get_db
 from fastapi import FastAPI, Depends, HTTPException, status

@@ -31,6 +31,93 @@ export default function Leaderboard({ users, currentUser, matches = [], predicti
   const [selectedGroup, setSelectedGroup] = useState(null);
   const [groupUsers, setGroupUsers] = useState([]);
   const [loadingGroups, setLoadingGroups] = useState(false);
+
+  // Leaderboard Simulator States
+  const [isSimulating, setIsSimulating] = useState(false);
+  const [simulatedScores, setSimulatedScores] = useState({});
+
+  // Filter scheduled matches for simulation
+  const scheduledMatches = useMemo(() => {
+    return matches.filter(m => m.status === 'scheduled');
+  }, [matches]);
+
+  const simulatedBonusPoints = useMemo(() => {
+    let bonusPoints = 0;
+    Object.entries(simulatedScores).forEach(([matchIdStr, score]) => {
+      const matchId = parseInt(matchIdStr);
+      const homeSim = parseInt(score.home);
+      const awaySim = parseInt(score.away);
+      if (isNaN(homeSim) || isNaN(awaySim)) return;
+
+      const pred = predictions.find(p => p.match_id === matchId);
+      if (!pred) return;
+
+      const pHome = pred.home_prediction;
+      const pAway = pred.away_prediction;
+
+      const simOutcome = homeSim > awaySim ? 1 : (awaySim > homeSim ? 2 : 0);
+      const predOutcome = pHome > pAway ? 1 : (pAway > pHome ? 2 : 0);
+
+      if (pHome === homeSim && pAway === awaySim) {
+        bonusPoints += 3;
+      } else if (simOutcome === predOutcome) {
+        bonusPoints += 1;
+      }
+    });
+    return bonusPoints;
+  }, [simulatedScores, predictions]);
+
+  const displayUsers = useMemo(() => {
+    if (!isSimulating) return users;
+    const bonus = simulatedBonusPoints;
+
+    const updated = users.map(u => {
+      const isMe = currentUser && (u.display_name === currentUser.display_name || u.email === currentUser.email);
+      if (isMe) return { ...u, points: u.points + bonus, simulatedBonus: bonus };
+      return { ...u, simulatedBonus: 0 };
+    });
+
+    const sorted = [...updated].sort((a, b) => b.points - a.points);
+    let currentRank = 1;
+    let prevPoints = null;
+    return sorted.map((u, i) => {
+      if (prevPoints !== null && u.points < prevPoints) {
+        currentRank = i + 1;
+      }
+      prevPoints = u.points;
+      return {
+        ...u,
+        simulatedRank: currentRank,
+        rankDiff: u.rank - currentRank
+      };
+    });
+  }, [isSimulating, simulatedBonusPoints, users, currentUser]);
+
+  const displayGroupUsers = useMemo(() => {
+    if (!isSimulating) return groupUsers;
+    const bonus = simulatedBonusPoints;
+
+    const updated = groupUsers.map(u => {
+      const isMe = currentUser && (u.display_name === currentUser.display_name || u.email === currentUser.email);
+      if (isMe) return { ...u, points: u.points + bonus, simulatedBonus: bonus };
+      return { ...u, simulatedBonus: 0 };
+    });
+
+    const sorted = [...updated].sort((a, b) => b.points - a.points);
+    let currentRank = 1;
+    let prevPoints = null;
+    return sorted.map((u, i) => {
+      if (prevPoints !== null && u.points < prevPoints) {
+        currentRank = i + 1;
+      }
+      prevPoints = u.points;
+      return {
+        ...u,
+        simulatedRank: currentRank,
+        rankDiff: u.rank - currentRank
+      };
+    });
+  }, [isSimulating, simulatedBonusPoints, groupUsers, currentUser]);
   
   // Action forms state
   const [showCreateForm, setShowCreateForm] = useState(false);
@@ -380,6 +467,92 @@ export default function Leaderboard({ users, currentUser, matches = [], predicti
       {/* ────────────────── GENERAL TAB VIEW ────────────────── */}
       {activeTab === 'general' && (
         <div className="space-y-6">
+          {/* 🔮 Simulator Toggle Button */}
+          <div className="flex justify-between items-center bg-slate-900/25 p-3 rounded-2xl border border-slate-900/60 backdrop-blur-sm">
+            <div className="flex items-center gap-1.5 text-slate-350 font-bold uppercase tracking-wider">
+              <Sparkles className="w-4 h-4 text-brand-gold animate-pulse" />
+              <span>Simulador de Clasificación:</span>
+            </div>
+            <button
+              onClick={() => {
+                playClickSound();
+                triggerHapticFeedback(20);
+                setIsSimulating(!isSimulating);
+                if (!isSimulating) setSimulatedScores({});
+              }}
+              className={`py-1.5 px-3 rounded-xl text-xs font-extrabold uppercase tracking-wider transition-all border ${
+                isSimulating
+                  ? 'bg-red-500/10 border-red-500/30 text-red-400'
+                  : 'bg-brand-gold text-brand-dark hover:bg-amber-400 border-transparent shadow-lg shadow-brand-gold/10'
+              }`}
+            >
+              {isSimulating ? 'Cerrar Simulador' : 'Simular Resultados 🔮'}
+            </button>
+          </div>
+
+          {/* 🔮 Simulator Controls Card */}
+          {isSimulating && (
+            <div className="glass rounded-3xl p-5 border border-brand-gold/20 relative overflow-hidden space-y-4 animate-[fadeIn_0.3s_ease-out]">
+              <div className="absolute right-0 top-0 w-32 h-32 bg-brand-gold/5 rounded-full blur-2xl pointer-events-none"></div>
+              <div>
+                <h4 className="text-sm font-extrabold text-white">Resultados de Partidos Futuros</h4>
+                <p className="text-[10px] text-slate-400 mt-0.5 font-medium">Ingresa marcadores simulados y mira cómo subes en la tabla según tus predicciones.</p>
+              </div>
+
+              {scheduledMatches.length === 0 ? (
+                <p className="text-xs text-slate-500 italic py-4 text-center">No hay partidos futuros programados para simular.</p>
+              ) : (
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 max-h-[220px] overflow-y-auto pr-1 no-scrollbar">
+                  {scheduledMatches.map(match => {
+                    const pred = predictions.find(p => p.match_id === match.id);
+                    const currentSim = simulatedScores[match.id] || { home: '', away: '' };
+                    
+                    return (
+                      <div key={match.id} className="p-3 bg-slate-950/45 rounded-xl border border-slate-900 flex items-center justify-between gap-3 text-xs">
+                        <div className="flex flex-col gap-0.5 min-w-0">
+                          <span className="font-semibold text-slate-300 truncate">{match.home_team} vs {match.away_team}</span>
+                          <span className="text-[9px] text-slate-500 font-medium">
+                            Tu predicción: {pred ? `${pred.home_prediction} - ${pred.away_prediction}` : 'Ninguna'}
+                          </span>
+                        </div>
+
+                        <div className="flex items-center gap-1 flex-shrink-0">
+                          <input
+                            type="number"
+                            min="0"
+                            placeholder="L"
+                            value={currentSim.home}
+                            onChange={e => {
+                              setSimulatedScores(prev => ({
+                                ...prev,
+                                [match.id]: { ...currentSim, home: e.target.value }
+                              }));
+                            }}
+                            className="w-8 py-1 text-center bg-slate-900 border border-slate-800 rounded-lg text-white font-bold placeholder-slate-655"
+                          />
+                          <span className="text-slate-600 font-bold">-</span>
+                          <input
+                            type="number"
+                            min="0"
+                            placeholder="V"
+                            value={currentSim.away}
+                            onChange={e => {
+                              setSimulatedScores(prev => ({
+                                ...prev,
+                                [match.id]: { ...currentSim, away: e.target.value }
+                              }));
+                            }}
+                            className="w-8 py-1 text-center bg-slate-900 border border-slate-800 rounded-lg text-white font-bold placeholder-slate-655"
+                          />
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          )}
+
           {/* 🏆 Visual Podium for Top 3 */}
           {top3.length >= 2 && (
             <div className="glass rounded-3xl p-6 border border-slate-800 relative overflow-hidden">
@@ -435,9 +608,10 @@ export default function Leaderboard({ users, currentUser, matches = [], predicti
                   <div className="col-span-3 text-right">Puntos</div>
                 </div>
 
-                {users.map((item, index) => {
+                {displayUsers.map((item, index) => {
                   const isMe = currentUser && (currentUser.display_name === item.display_name || currentUser.email === item.email);
                   const isExpanded = expandedUserId === item.id;
+                  const itemRank = isSimulating ? item.simulatedRank : item.rank;
                   return (
                     <React.Fragment key={index}>
                       <div
@@ -446,8 +620,13 @@ export default function Leaderboard({ users, currentUser, matches = [], predicti
                           isMe ? 'bg-brand-accent/5 border-l-2 border-brand-accent' : 'hover:bg-slate-900/20'
                         } ${isExpanded ? 'bg-slate-900/40 border-b border-slate-850' : ''}`}
                       >
-                        <div className="col-span-2 flex justify-center">
-                          {getRankBadge(item.rank)}
+                        <div className="col-span-2 flex justify-center items-center gap-1">
+                          {getRankBadge(itemRank)}
+                          {isSimulating && item.rankDiff !== 0 && (
+                            <span className={`text-[9px] font-bold ${item.rankDiff > 0 ? 'text-emerald-400' : 'text-red-400'}`}>
+                              {item.rankDiff > 0 ? `▲${item.rankDiff}` : `▼${Math.abs(item.rankDiff)}`}
+                            </span>
+                          )}
                         </div>
 
                         <div className="col-span-7 flex items-center gap-3 pl-2">
@@ -479,9 +658,14 @@ export default function Leaderboard({ users, currentUser, matches = [], predicti
                         </div>
 
                         <div className="col-span-3 text-right">
-                          <span className={`text-base font-black ${item.rank === 1 ? 'text-brand-gold' : (isMe ? 'text-brand-accent' : 'text-slate-100')}`}>
+                          <span className={`text-base font-black ${itemRank === 1 ? 'text-brand-gold' : (isMe ? 'text-brand-accent' : 'text-slate-100')}`}>
                             {item.points}
                           </span>
+                          {isSimulating && item.simulatedBonus > 0 && (
+                            <span className="text-[10px] text-emerald-450 font-bold ml-1">
+                              (+{item.simulatedBonus})
+                            </span>
+                          )}
                           <span className="text-[10px] text-slate-500 font-semibold ml-1">Pts</span>
                         </div>
                       </div>
@@ -610,9 +794,10 @@ export default function Leaderboard({ users, currentUser, matches = [], predicti
                       <div className="col-span-3 text-right">Puntos</div>
                     </div>
 
-                    {groupUsers.map((item, index) => {
+                    {displayGroupUsers.map((item, index) => {
                       const isMe = currentUser && (currentUser.display_name === item.display_name || currentUser.email === item.email);
                       const isExpanded = expandedUserId === item.id;
+                      const itemRank = isSimulating ? item.simulatedRank : item.rank;
                       return (
                         <React.Fragment key={index}>
                           <div
@@ -621,8 +806,13 @@ export default function Leaderboard({ users, currentUser, matches = [], predicti
                               isMe ? 'bg-brand-accent/5 border-l-2 border-brand-accent' : 'hover:bg-slate-900/20'
                             } ${isExpanded ? 'bg-slate-900/40 border-b border-slate-850' : ''}`}
                           >
-                            <div className="col-span-2 flex justify-center">
-                              {getRankBadge(item.rank)}
+                            <div className="col-span-2 flex justify-center items-center gap-1">
+                              {getRankBadge(itemRank)}
+                              {isSimulating && item.rankDiff !== 0 && (
+                                <span className={`text-[9px] font-bold ${item.rankDiff > 0 ? 'text-emerald-400' : 'text-red-400'}`}>
+                                  {item.rankDiff > 0 ? `▲${item.rankDiff}` : `▼${Math.abs(item.rankDiff)}`}
+                                </span>
+                              )}
                             </div>
 
                             <div className="col-span-7 flex items-center gap-3 pl-2">
@@ -649,9 +839,14 @@ export default function Leaderboard({ users, currentUser, matches = [], predicti
                             </div>
 
                             <div className="col-span-3 text-right">
-                              <span className={`text-base font-black ${item.rank === 1 ? 'text-brand-gold' : (isMe ? 'text-brand-accent' : 'text-slate-100')}`}>
+                              <span className={`text-base font-black ${itemRank === 1 ? 'text-brand-gold' : (isMe ? 'text-brand-accent' : 'text-slate-100')}`}>
                                 {item.points}
                               </span>
+                              {isSimulating && item.simulatedBonus > 0 && (
+                                <span className="text-[10px] text-emerald-450 font-bold ml-1">
+                                  (+{item.simulatedBonus})
+                                </span>
+                              )}
                               <span className="text-[10px] text-slate-500 font-semibold ml-1">Pts</span>
                             </div>
                           </div>

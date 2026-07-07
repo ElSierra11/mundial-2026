@@ -1,7 +1,7 @@
-import { Trophy, Calendar, ShieldCheck, LogOut, Sparkles, GitBranch, MessageSquare, User, Users } from 'lucide-react';
+import { Trophy, Calendar, ShieldCheck, LogOut, Sparkles, GitBranch, MessageSquare, User, Users, Volume2, VolumeX } from 'lucide-react';
 import { playClickSound, triggerHapticFeedback } from '../utils/soundEffects';
 
-export default function Navbar({ activeTab, setActiveTab, user, onLogout, isDemo }) {
+export default function Navbar({ activeTab, setActiveTab, user, onLogout, isDemo, isTtsEnabled, toggleTts }) {
   const handleTabClick = (tabId) => {
     playClickSound();
     triggerHapticFeedback(15);
@@ -93,6 +93,18 @@ export default function Navbar({ activeTab, setActiveTab, user, onLogout, isDemo
             </button>
 
             <button
+              onClick={() => handleTabClick('trivia')}
+              className={`flex items-center gap-2 py-2 px-4 rounded-xl text-sm font-semibold transition-all ${
+                activeTab === 'trivia'
+                  ? 'bg-brand-gold text-brand-dark shadow-lg shadow-brand-gold/15'
+                  : 'text-slate-400 hover:text-slate-200'
+              }`}
+            >
+              <HelpCircle className="w-4 h-4" />
+              <span>Trivia</span>
+            </button>
+
+            <button
               onClick={() => handleTabClick('profile')}
               className={`flex items-center gap-2 py-2 px-4 rounded-xl text-sm font-semibold transition-all ${
                 activeTab === 'profile'
@@ -120,7 +132,24 @@ export default function Navbar({ activeTab, setActiveTab, user, onLogout, isDemo
           </nav>
 
           {/* User Profile & Logout */}
-          <div className="flex items-center gap-4">
+          <div className="flex items-center gap-3">
+            {/* TTS volume toggle */}
+            <button
+              onClick={() => {
+                playClickSound();
+                triggerHapticFeedback(15);
+                toggleTts();
+              }}
+              className={`p-2.5 rounded-xl border transition-all ${
+                isTtsEnabled
+                  ? 'border-brand-gold/30 bg-brand-gold/10 text-brand-gold hover:bg-brand-gold/20'
+                  : 'border-slate-800 hover:border-slate-700 bg-slate-900/40 text-slate-500 hover:text-slate-400'
+              }`}
+              title={isTtsEnabled ? "Silenciar narración de goles" : "Activar narración de goles"}
+            >
+              {isTtsEnabled ? <Volume2 className="w-4 h-4" /> : <VolumeX className="w-4 h-4" />}
+            </button>
+
             <div className="flex items-center gap-3 bg-slate-900/40 py-1.5 pl-3 pr-4 rounded-2xl border border-slate-800">
               <img
                 src={user?.avatar_url || 'https://api.dicebear.com/7.x/adventurer/svg?seed=guest'}
@@ -170,6 +199,23 @@ export default function Navbar({ activeTab, setActiveTab, user, onLogout, isDemo
         </div>
 
         <div className="flex items-center gap-2">
+          {/* TTS volume toggle */}
+          <button
+            onClick={() => {
+              playClickSound();
+              triggerHapticFeedback(15);
+              toggleTts();
+            }}
+            className={`p-2 rounded-xl border transition-all ${
+              isTtsEnabled
+                ? 'border-brand-gold/30 bg-brand-gold/10 text-brand-gold'
+                : 'border-slate-800 bg-slate-900/40 text-slate-500'
+            }`}
+            title={isTtsEnabled ? "Silenciar" : "Activar narración"}
+          >
+            {isTtsEnabled ? <Volume2 className="w-4 h-4" /> : <VolumeX className="w-4 h-4" />}
+          </button>
+
           {/* User info widget */}
           <div className="flex items-center gap-2 bg-slate-900/50 py-1 px-2.5 rounded-xl border border-slate-800">
             <img
@@ -201,6 +247,7 @@ export default function Navbar({ activeTab, setActiveTab, user, onLogout, isDemo
           { id: 'leaderboard', icon: <Trophy className="w-5 h-5" />,        label: 'Ranking'  },
           { id: 'groups',      icon: <Users className="w-5 h-5" />,         label: 'Grupos'   },
           { id: 'chat',        icon: <MessageSquare className="w-5 h-5" />, label: 'Chat'     },
+          { id: 'trivia',      icon: <HelpCircle className="w-5 h-5" />,    label: 'Trivia'   },
           { id: 'profile',     icon: <User className="w-5 h-5" />,          label: 'Perfil'   },
           ...(user?.is_admin ? [{ id: 'admin', icon: <ShieldCheck className="w-5 h-5" />, label: 'Admin' }] : [])
         ].map(tab => {

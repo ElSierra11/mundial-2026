@@ -17,6 +17,43 @@ export default function ChatView({ user, isDemo }) {
   const [loading, setLoading] = useState(false);
   const messagesEndRef = useRef(null);
 
+  // States for floating reactions
+  const [activeEmojis, setActiveEmojis] = useState([]);
+  const triggeredReactionsRef = useRef(new Set());
+
+  const triggerEmojiAnimation = (emoji) => {
+    const id = Date.now() + Math.random();
+    setActiveEmojis(prev => [...prev, { id, emoji, left: Math.random() * 80 + 10 }]);
+    setTimeout(() => {
+      setActiveEmojis(prev => prev.filter(item => item.id !== id));
+    }, 2500);
+  };
+
+  const sendReaction = async (emoji) => {
+    triggerEmojiAnimation(emoji);
+    try {
+      if (isDemo) {
+        const currentMsgs = JSON.parse(localStorage.getItem('demo_chat_messages') || '[]');
+        const newMsg = {
+          id: Date.now(),
+          user_name: user?.display_name || 'Tú',
+          user_avatar: user?.avatar_url || 'https://api.dicebear.com/7.x/adventurer/svg?seed=guest',
+          text: `[reaction:${emoji}]`,
+          timestamp: new Date().toISOString(),
+          is_admin: !!user?.is_admin
+        };
+        const updated = [...currentMsgs, newMsg];
+        localStorage.setItem('demo_chat_messages', JSON.stringify(updated));
+        setMessages(updated);
+      } else {
+        const newMsg = await api.sendChatMessage(`[reaction:${emoji}]`);
+        setMessages(prev => [...prev, newMsg]);
+      }
+    } catch (e) {
+      console.warn("Error sending reaction:", e);
+    }
+  };
+
   // Load chat messages
   const loadMessages = async () => {
     try {
@@ -78,6 +115,25 @@ export default function ChatView({ user, isDemo }) {
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
+
+  // Sync floating reactions when new messages arrive
+  useEffect(() => {
+    messages.forEach(msg => {
+      if (msg.text && msg.text.startsWith('[reaction:') && msg.text.endsWith(']')) {
+        if (!triggeredReactionsRef.current.has(msg.id)) {
+          triggeredReactionsRef.current.add(msg.id);
+          const msgTime = parseISO(msg.timestamp).getTime();
+          const now = Date.now();
+          if (now - msgTime < 15000) {
+            const emoji = msg.text.slice(10, -1);
+            triggerEmojiAnimation(emoji);
+          }
+        }
+      }
+    });
+  }, [messages]);
+
+  const displayMessages = messages.filter(msg => !msg.text?.startsWith('[reaction:'));
 
   const handleSendMessage = async (e) => {
     e.preventDefault();
@@ -221,7 +277,7 @@ export default function ChatView({ user, isDemo }) {
             <p className="text-xs font-semibold">¡Comienza el debate! Sé el primero en escribir.</p>
           </div>
         ) : (
-          messages.map((msg) => {
+          displayMessages.map((msg) => {
             const isMe = msg.user_name === user?.display_name || msg.user_id === user?.id;
             return (
               <div
@@ -260,8 +316,57 @@ export default function ChatView({ user, isDemo }) {
         <div ref={messagesEndRef} />
       </div>
 
+      {/* Floating Emojis elements */}
+      {activeEmojis.map(e => (
+        <span
+          key={e.id}
+          className="absolute bottom-20 pointer-events-none text-2xl z-30 select-none animate-[floatUpEmoji_2.2s_cubic-bezier(0.08,0.82,0.17,1)_forwards]"
+          style={{ left: `${e.left}%` }}
+        >
+          {e.emoji}
+        </span>
+      ))}
+
+      {/* Emojis float animation styles */}
+      <style dangerouslySetInnerHTML={{ __html: `
+        @keyframes floatUpEmoji {
+          0% {
+            transform: translateY(0) scale(0.6);
+            opacity: 0;
+          }
+          10% {
+            opacity: 1;
+            transform: translateY(-20px) scale(1.3);
+          }
+          90% {
+            opacity: 0.8;
+          }
+          100% {
+            transform: translateY(-340px) scale(0.8);
+            opacity: 0;
+          }
+        }
+      `}} />
+
+      {/* Quick Reaction Bar */}
+      <div className="px-4 py-2 bg-slate-950/40 border-t border-slate-900/60 flex items-center justify-between gap-2 shrink-0 relative z-20">
+        <span className="text-[9px] text-slate-500 font-bold uppercase tracking-wider">Reaccionar:</span>
+        <div className="flex items-center gap-1.5">
+          {['⚽', '🔥', '🏆', '😱', '🤫', '📣'].map(emoji => (
+            <button
+              key={emoji}
+              type="button"
+              onClick={() => sendReaction(emoji)}
+              className="w-7.5 h-7.5 rounded-lg bg-slate-900/40 border border-slate-850 hover:border-brand-gold/30 hover:bg-slate-850 active:scale-90 transition-all text-sm flex items-center justify-center shrink-0"
+            >
+              {emoji}
+            </button>
+          ))}
+        </div>
+      </div>
+
       {/* Input Message Area */}
-      <form onSubmit={handleSendMessage} className="p-4 bg-slate-950/65 border-t border-slate-900/80 flex items-center gap-3">
+      <form onSubmit={handleSendMessage} className="p-4 bg-slate-950/65 border-t border-slate-900/80 flex items-center gap-3 relative z-20">
         <input
           type="text"
           value={inputText}
