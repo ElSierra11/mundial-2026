@@ -1,7 +1,7 @@
 // Client API for World Cup Predictions App
 // Handles backend calls or falls back to LocalStorage in Demo Mode.
 
-const API_BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:8000";
+const API_BASE_URL = import.meta.env.VITE_API_URL || "https://mundial-backend-h960.onrender.com";
 
 // Helper to get auth headers
 const getHeaders = () => {
