@@ -110,19 +110,33 @@ export function mergeLiveData(localMatches, liveMatches) {
     const homeName = local.home_team?.toLowerCase().trim();
     const awayName = local.away_team?.toLowerCase().trim();
     
+    let inverted = false;
     const live = liveMatches.find(l => {
       const lh = l.home_team_es?.toLowerCase().trim();
       const la = l.away_team_es?.toLowerCase().trim();
-      return (lh === homeName && la === awayName) ||
-             (l.home_team_en?.toLowerCase() === homeName && l.away_team_en?.toLowerCase() === awayName);
+      const lhEn = l.home_team_en?.toLowerCase().trim();
+      const laEn = l.away_team_en?.toLowerCase().trim();
+
+      if ((lh === homeName && la === awayName) || (lhEn === homeName && laEn === awayName)) {
+        inverted = false;
+        return true;
+      }
+      if ((lh === awayName && la === homeName) || (lhEn === awayName && laEn === homeName)) {
+        inverted = true;
+        return true;
+      }
+      return false;
     });
 
     if (!live) return local;
 
+    const liveHomeScore = inverted ? live.away_score : live.home_score;
+    const liveAwayScore = inverted ? live.home_score : live.away_score;
+
     return {
       ...local,
-      home_score: live.home_score ?? local.home_score,
-      away_score: live.away_score ?? local.away_score,
+      home_score: liveHomeScore ?? local.home_score,
+      away_score: liveAwayScore ?? local.away_score,
       status: live.status !== 'scheduled' ? live.status : local.status,
       live_clock: live.clock,
       live_period: live.period,

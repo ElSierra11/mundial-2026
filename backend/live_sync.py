@@ -249,13 +249,16 @@ def sync_scores_to_db(events: list[dict]):
                 
                 # Buscar el partido en nuestra base de datos por equipos
                 db_match = None
+                inverted = False
                 for m in db_matches:
                     if (m.home_team == espn_home and m.away_team == espn_away):
                         db_match = m
+                        inverted = False
                         break
                     # Intentar al reves por si estan intercambiados
                     if (m.home_team == espn_away and m.away_team == espn_home):
                         db_match = m
+                        inverted = True
                         break
                 
                 if not db_match:
@@ -303,15 +306,27 @@ def sync_scores_to_db(events: list[dict]):
                     except Exception as e:
                         logger.warning(f"Error parsing date from ESPN: {e}")
 
+                # Ajustar marcadores y penales según si el orden de los equipos está invertido en ESPN
+                if inverted:
+                    target_home_score = espn_away_score
+                    target_away_score = espn_home_score
+                    target_home_penalties = espn_away_penalties
+                    target_away_penalties = espn_home_penalties
+                else:
+                    target_home_score = espn_home_score
+                    target_away_score = espn_away_score
+                    target_home_penalties = espn_home_penalties
+                    target_away_penalties = espn_away_penalties
+
                 # Solo actualizar si hay cambios reales
                 status_changed = (db_match.status != espn_status)
                 score_changed = (
-                    db_match.home_score != espn_home_score or
-                    db_match.away_score != espn_away_score
+                    db_match.home_score != target_home_score or
+                    db_match.away_score != target_away_score
                 )
                 penalties_changed = (
-                    db_match.home_penalties != espn_home_penalties or
-                    db_match.away_penalties != espn_away_penalties or
+                    db_match.home_penalties != target_home_penalties or
+                    db_match.away_penalties != target_away_penalties or
                     db_match.penalties_winner != espn_penalties_winner
                 )
                 time_changed = (espn_time is not None and db_match.match_time != espn_time)
@@ -319,15 +334,15 @@ def sync_scores_to_db(events: list[dict]):
                 if status_changed or score_changed or penalties_changed or time_changed:
                     old_status = db_match.status
                     
-                    if espn_home_score is not None:
-                        db_match.home_score = espn_home_score
-                    if espn_away_score is not None:
-                        db_match.away_score = espn_away_score
+                    if target_home_score is not None:
+                        db_match.home_score = target_home_score
+                    if target_away_score is not None:
+                        db_match.away_score = target_away_score
                     if espn_time is not None:
                         db_match.match_time = espn_time
                     
-                    db_match.home_penalties = espn_home_penalties
-                    db_match.away_penalties = espn_away_penalties
+                    db_match.home_penalties = target_home_penalties
+                    db_match.away_penalties = target_away_penalties
                     db_match.penalties_winner = espn_penalties_winner
                     
                     if espn_status in ("live", "finished", "scheduled"):
@@ -337,7 +352,7 @@ def sync_scores_to_db(events: list[dict]):
                     
                     logger.info(
                         f"[LiveSync] Actualizado: {db_match.home_team} vs {db_match.away_team} "
-                        f"| {espn_home_score}-{espn_away_score} (Pens: {espn_home_penalties}-{espn_away_penalties}, Winner: {espn_penalties_winner}) | {espn_status}"
+                        f"| {target_home_score}-{target_away_score} (Pens: {target_home_penalties}-{target_away_penalties}, Winner: {espn_penalties_winner}) | {espn_status}"
                     )
                     
                     # Si el partido terminó, recalcular puntos y avanzar la llave (siempre que esté terminado)
