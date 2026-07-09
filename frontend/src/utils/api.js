@@ -582,37 +582,40 @@ export const api = {
     const predictions = JSON.parse(localStorage.getItem("demo_predictions"));
     const users = JSON.parse(localStorage.getItem("demo_users"));
 
-    // Reset user points to 0
-    users.forEach(u => { u.points = 0; });
-
-    // Score predictions
+    // Score predictions incrementally
     predictions.forEach(pred => {
       const match = matches.find(m => m.id === pred.match_id);
-      if (!match || match.status !== "finished" || match.home_score === null || match.away_score === null) {
-        pred.points_earned = null;
-        return;
+      
+      const old_pts = pred.points_earned || 0;
+      let new_pts = null;
+
+      if (match && match.status === "finished" && match.home_score !== null && match.away_score !== null) {
+        const pHome = pred.home_prediction;
+        const pAway = pred.away_prediction;
+        const mHome = match.home_score;
+        const mAway = match.away_score;
+
+        const matchOutcome = mHome > mAway ? 1 : (mAway > mHome ? 2 : 0);
+        const predOutcome = pHome > pAway ? 1 : (pAway > pHome ? 2 : 0);
+
+        if (pHome === mHome && pAway === mAway) {
+          new_pts = 3; // Exact match
+        } else if (matchOutcome === predOutcome) {
+          new_pts = 1; // Correct outcome
+        } else {
+          new_pts = 0; // Wrong
+        }
       }
 
-      const pHome = pred.home_prediction;
-      const pAway = pred.away_prediction;
-      const mHome = match.home_score;
-      const mAway = match.away_score;
+      pred.points_earned = new_pts;
 
-      const matchOutcome = mHome > mAway ? 1 : (mAway > mHome ? 2 : 0);
-      const predOutcome = pHome > pAway ? 1 : (pAway > pHome ? 2 : 0);
-
-      if (pHome === mHome && pAway === mAway) {
-        pred.points_earned = 3; // Exact match
-      } else if (matchOutcome === predOutcome) {
-        pred.points_earned = 1; // Correct outcome
-      } else {
-        pred.points_earned = 0; // Wrong
-      }
-
-      // Add to user points
-      const user = users.find(u => u.id === pred.user_id);
-      if (user) {
-        user.points += pred.points_earned;
+      // Apply difference incrementally
+      const diff = (new_pts || 0) - old_pts;
+      if (diff !== 0) {
+        const user = users.find(u => u.id === pred.user_id);
+        if (user) {
+          user.points = Math.max(0, (user.points || 0) + diff);
+        }
       }
     });
 

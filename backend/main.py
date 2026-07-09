@@ -1162,7 +1162,8 @@ def reset_database(
         db.commit()
         
         # Reset user points
-        crud.recalculate_all_user_points(db)
+        db.execute(text("UPDATE users SET points = 0"))
+        db.commit()
         
         return {"message": "Base de datos reiniciada con partidos reales del Mundial 2026."}
     except Exception as e:

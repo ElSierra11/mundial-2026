@@ -304,7 +304,12 @@ def recalculate_points_for_match(db: Session, match_id: int):
         # Reset prediction points if match is not finished
         predictions = db.query(models.Prediction).filter(models.Prediction.match_id == match_id).all()
         for pred in predictions:
+            old_pts = pred.points_earned or 0
             pred.points_earned = None
+            if old_pts > 0:
+                user = get_user(db, pred.user_id)
+                if user:
+                    user.points = max(0, (user.points or 0) - old_pts)
         db.commit()
         return
 
@@ -320,25 +325,33 @@ def recalculate_points_for_match(db: Session, match_id: int):
         pred_away = pred.away_prediction
         pred_outcome = 1 if pred_home > pred_away else (2 if pred_away > pred_home else 0)
         
+        old_pts = pred.points_earned or 0
+        
         if pred_home == actual_home and pred_away == actual_away:
             # Exact score: 3 points
-            pred.points_earned = 3
+            new_pts = 3
         elif pred_outcome == actual_outcome:
             # Correct winner/draw, wrong score: 1 point
-            pred.points_earned = 1
+            new_pts = 1
         else:
             # Wrong winner/draw: 0 points
-            pred.points_earned = 0
+            new_pts = 0
+            
+        pred.points_earned = new_pts
+        
+        # Apply difference incrementally
+        diff = new_pts - old_pts
+        if diff != 0:
+            user = get_user(db, pred.user_id)
+            if user:
+                user.points = max(0, (user.points or 0) + diff)
             
     db.commit()
 
 def recalculate_all_user_points(db: Session):
-    db.execute(text(
-        "UPDATE users SET points = COALESCE("
-        "(SELECT SUM(points_earned) FROM predictions "
-        " WHERE predictions.user_id = users.id AND predictions.points_earned IS NOT NULL), 0)"
-    ))
-    db.commit()
+    # This is deprecated to prevent wiping other user points (e.g. manual adjustments, trivia).
+    # Incremental updates are performed instead in recalculate_points_for_match.
+    pass
 
 
 def get_chat_messages(db: Session, limit: int = 50):
