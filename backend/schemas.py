@@ -174,3 +174,8 @@ class MatchPredictionsResponse(BaseModel):
     match_id: int
     is_locked: bool  # True if predictions are closed (live or finished)
     predictions: List[MatchPredictionItem]
+
+
+class PushSubscriptionCreate(BaseModel):
+    endpoint: str
+    keys: dict

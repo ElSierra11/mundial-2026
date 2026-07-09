@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { Award, Flame, Zap, User, Star, Percent, ShieldCheck, HelpCircle, History, Trophy, CheckCircle2, XCircle, Clock, Bell } from 'lucide-react';
+import { subscribeUserToPush } from '../utils/pushNotifications';
 
 const COPA_TEAMS = [
   "Alemania", "Argelia", "Argentina", "Australia", "Austria", "Bélgica", "Bosnia y Herz.", "Brasil", 
@@ -41,20 +42,19 @@ export default function ProfileView({ user, predictions, matches, onUpdateProfil
       return;
     }
 
-    if (Notification.permission === 'granted') {
-      alert("Las notificaciones ya están activadas en este dispositivo. Para cambiarlas, puedes modificar la configuración en tu navegador.");
-      return;
-    }
-
-    const permission = await Notification.requestPermission();
-    setNotifPermission(permission);
-    if (permission === 'granted') {
-      new Notification("🔔 ¡Alertas Activadas!", {
-        body: "Ya estás listo para recibir notificaciones de goles en vivo del Mundial 2026.",
-        icon: '/logo.png'
-      });
-    } else if (permission === 'denied') {
-      alert("Permiso denegado. Si quieres recibir alertas, por favor habilita los permisos de notificación de la página en tu navegador.");
+    try {
+      const permission = await Notification.requestPermission();
+      setNotifPermission(permission);
+      
+      if (permission === 'granted') {
+        // Subscribe to real push notifications and trigger test notification
+        await subscribeUserToPush();
+      } else if (permission === 'denied') {
+        alert("Permiso denegado. Si quieres recibir alertas, por favor habilita los permisos de notificación de la página en tu navegador.");
+      }
+    } catch (err) {
+      console.error("Error setting up push notifications:", err);
+      alert("Error al activar las notificaciones push: " + err.message);
     }
   };
   

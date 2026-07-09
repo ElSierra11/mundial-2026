@@ -481,3 +481,36 @@ def delete_user(db: Session, user_id: str):
     return False
 
 
+def create_push_subscription(db: Session, user_id: str, sub: schemas.PushSubscriptionCreate):
+    # Check if subscription already exists
+    db_sub = db.query(models.PushSubscription).filter_by(endpoint=sub.endpoint).first()
+    if db_sub:
+        db_sub.user_id = user_id
+        db_sub.p256dh = sub.keys.get("p256dh", "")
+        db_sub.auth = sub.keys.get("auth", "")
+    else:
+        db_sub = models.PushSubscription(
+            user_id=user_id,
+            endpoint=sub.endpoint,
+            p256dh=sub.keys.get("p256dh", ""),
+            auth=sub.keys.get("auth", "")
+        )
+        db.add(db_sub)
+    db.commit()
+    db.refresh(db_sub)
+    return db_sub
+
+
+def delete_push_subscription(db: Session, endpoint: str):
+    db_sub = db.query(models.PushSubscription).filter_by(endpoint=endpoint).first()
+    if db_sub:
+        db.delete(db_sub)
+        db.commit()
+        return True
+    return False
+
+
+def get_push_subscriptions_by_user(db: Session, user_id: str):
+    return db.query(models.PushSubscription).filter_by(user_id=user_id).all()
+
+

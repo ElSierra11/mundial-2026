@@ -846,6 +846,53 @@ export const api = {
     const response = await fetch(`${API_BASE_URL}/api/users/${userId}/predictions`, { headers: getHeaders() });
     if (!response.ok) throw new Error("Error al obtener predicciones del usuario");
     return await response.json();
+  },
+
+  async getVapidPublicKey() {
+    if (this.getMode() === "demo") {
+      return { public_key: "MOCK_PUBLIC_KEY" };
+    }
+    const response = await fetch(`${API_BASE_URL}/api/notifications/vapid-key`, { headers: getHeaders() });
+    if (!response.ok) throw new Error("Error al obtener la llave VAPID");
+    return await response.json();
+  },
+
+  async subscribePushNotifications(subscription) {
+    if (this.getMode() === "demo") {
+      console.log("[Demo Mode] Suscrito a notificaciones push", subscription);
+      localStorage.setItem("demo_push_subscription", JSON.stringify(subscription));
+      return { message: "Suscripción guardada en modo demo" };
+    }
+    const response = await fetch(`${API_BASE_URL}/api/notifications/subscribe`, {
+      method: "POST",
+      headers: getHeaders(),
+      body: JSON.stringify(subscription)
+    });
+    if (!response.ok) throw new Error("Error al registrar notificaciones push");
+    return await response.json();
+  },
+
+  async testPushNotification() {
+    if (this.getMode() === "demo") {
+      if ('Notification' in window && Notification.permission === 'granted') {
+        navigator.serviceWorker.ready.then(reg => {
+          reg.showNotification("🔔 Prueba de Notificación Push (Demo)", {
+            body: "¡Felicidades! Las notificaciones están simuladas correctamente.",
+            icon: "/logo.png"
+          });
+        });
+      }
+      return { message: "Notificación de prueba enviada en modo demo." };
+    }
+    const response = await fetch(`${API_BASE_URL}/api/notifications/test`, {
+      method: "POST",
+      headers: getHeaders()
+    });
+    if (!response.ok) {
+      const err = await response.json().catch(() => ({}));
+      throw new Error(err.detail || "Error al enviar notificación de prueba");
+    }
+    return await response.json();
   }
 };
 

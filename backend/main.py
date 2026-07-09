@@ -5,6 +5,10 @@ import auth
 import live_sync
 import asyncio
 import os
+import json
+import base64
+from pywebpush import webpush, WebPushException
+from cryptography.hazmat.primitives.asymmetric import ec
 # Load local .env file manually on startup if present
 if os.path.exists(".env"):
     print("[BACKEND] Loading environment variables from .env file...")
@@ -87,6 +91,102 @@ run_migrations()
 # Create DB tables
 models.Base.metadata.create_all(bind=engine)
 
+# VAPID Key Generation & Push Notification Helpers
+def generate_vapid_keys():
+    private_key = ec.generate_private_key(ec.SECP256R1())
+    priv_num = private_key.private_numbers().private_value
+    priv_bytes = priv_num.to_bytes(32, byteorder='big')
+    
+    pub_numbers = private_key.public_key().public_numbers()
+    x_bytes = pub_numbers.x.to_bytes(32, byteorder='big')
+    y_bytes = pub_numbers.y.to_bytes(32, byteorder='big')
+    pub_bytes = b'\x04' + x_bytes + y_bytes
+    
+    pub_b64 = base64.urlsafe_b64encode(pub_bytes).decode('utf-8').rstrip('=')
+    priv_b64 = base64.urlsafe_b64encode(priv_bytes).decode('utf-8').rstrip('=')
+    return pub_b64, priv_b64
+
+def check_and_generate_vapid_keys():
+    if "VAPID_PUBLIC_KEY" in os.environ and "VAPID_PRIVATE_KEY" in os.environ:
+        return
+        
+    if os.path.exists(".env"):
+        with open(".env", "r", encoding="utf-8") as f:
+            for line in f:
+                line = line.strip()
+                if not line or line.startswith("#"):
+                    continue
+                if "=" in line:
+                    key, val = line.split("=", 1)
+                    if key.strip() == "VAPID_PUBLIC_KEY":
+                        os.environ["VAPID_PUBLIC_KEY"] = val.strip()
+                    elif key.strip() == "VAPID_PRIVATE_KEY":
+                        os.environ["VAPID_PRIVATE_KEY"] = val.strip()
+                    
+    if "VAPID_PUBLIC_KEY" in os.environ and "VAPID_PRIVATE_KEY" in os.environ:
+        return
+
+    print("[PUSH] Generando llaves VAPID por primera vez...")
+    try:
+        pub_key, priv_key = generate_vapid_keys()
+        with open(".env", "a", encoding="utf-8") as f:
+            f.write(f"\n# VAPID Keys for Web Push Notifications\n")
+            f.write(f"VAPID_PUBLIC_KEY={pub_key}\n")
+            f.write(f"VAPID_PRIVATE_KEY={priv_key}\n")
+            
+        os.environ["VAPID_PUBLIC_KEY"] = pub_key
+        os.environ["VAPID_PRIVATE_KEY"] = priv_key
+        print("[PUSH] Llaves VAPID generadas y guardadas en .env!")
+    except Exception as e:
+        print(f"[PUSH ERROR] Error al generar/guardar llaves VAPID: {e}")
+
+check_and_generate_vapid_keys()
+
+def send_push_notification(endpoint: str, p256dh: str, auth: str, title: str, body: str, icon: str = None, url: str = None):
+    private_key = os.environ.get("VAPID_PRIVATE_KEY")
+    public_key = os.environ.get("VAPID_PUBLIC_KEY")
+    claims_email = os.environ.get("SMTP_USERNAME") or "admin@polla.com"
+    
+    if not private_key or not public_key:
+        print("[PUSH] Llaves VAPID no configuradas. Omitiendo notificación push.")
+        return False
+        
+    subscription_info = {
+        "endpoint": endpoint,
+        "keys": {
+            "p256dh": p256dh,
+            "auth": auth
+        }
+    }
+    
+    payload = {
+        "notification": {
+            "title": title,
+            "body": body,
+            "icon": icon or "/logo.png",
+            "data": {
+                "url": url or "/"
+            }
+        }
+    }
+    
+    try:
+        webpush(
+            subscription_info=subscription_info,
+            data=json.dumps(payload),
+            vapid_private_key=private_key,
+            vapid_claims={"sub": f"mailto:{claims_email}"}
+        )
+        return True
+    except WebPushException as ex:
+        print(f"[PUSH ERROR] Error al enviar push: {ex}")
+        if ex.response is not None and ex.response.status_code in [404, 410]:
+            return "remove"
+        return False
+    except Exception as e:
+        print(f"[PUSH ERROR] Error inesperado al enviar push: {e}")
+        return False
+
 import smtplib
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
@@ -159,7 +259,7 @@ def send_reminder_email(to_email: str, display_name: str, match_desc: str, kicko
         return False
 
 async def send_email_reminders_loop():
-    print("[REMINDERS] Email reminders background loop started (1 minute check interval).")
+    print("[REMINDERS] Reminders background loop started (1 minute check interval).")
     while True:
         try:
             db = SessionLocal()
@@ -189,9 +289,32 @@ async def send_email_reminders_loop():
                                 if reminder_key in SENT_REMINDERS:
                                     continue
                                     
-                                if user.email:
-                                    pred = db.query(models.Prediction).filter_by(user_id=user.id, match_id=match.id).first()
-                                    has_predicted = pred is not None
+                                pred = db.query(models.Prediction).filter_by(user_id=user.id, match_id=match.id).first()
+                                has_predicted = pred is not None
+                                
+                                push_sent = False
+                                # Only send push notification if the user HAS NOT predicted yet
+                                if not has_predicted:
+                                    subscriptions = crud.get_push_subscriptions_by_user(db, user.id)
+                                    if subscriptions:
+                                        for sub in subscriptions:
+                                            title = "⚠️ ¡Ingresa tu pronóstico!"
+                                            body = f"Solo quedan {interval} minutos para {match_desc}. ¡No dejes pasar tus puntos!"
+                                            res = send_push_notification(
+                                                endpoint=sub.endpoint,
+                                                p256dh=sub.p256dh,
+                                                auth=sub.auth,
+                                                title=title,
+                                                body=body,
+                                                url="/matches"
+                                            )
+                                            if res == "remove":
+                                                crud.delete_push_subscription(db, sub.endpoint)
+                                            elif res:
+                                                push_sent = True
+                                
+                                # Fallback to email if push failed/not registered, OR if user has already predicted
+                                if not push_sent and user.email:
                                     send_reminder_email(
                                         to_email=user.email,
                                         display_name=user.display_name or "Mundialista",
@@ -200,7 +323,8 @@ async def send_email_reminders_loop():
                                         interval=interval,
                                         has_predicted=has_predicted
                                     )
-                                    SENT_REMINDERS.add(reminder_key)
+                                
+                                SENT_REMINDERS.add(reminder_key)
             db.close()
         except Exception as e:
             print(f"[REMINDERS ERROR] Error in reminder loop: {e}")
@@ -1418,3 +1542,60 @@ def cast_champion_vote(
     db.refresh(db_user)
 
     return {"message": f"Voto registrado: {team}", "team": team}
+
+
+@app.get("/api/notifications/vapid-key")
+def get_vapid_public_key():
+    public_key = os.environ.get("VAPID_PUBLIC_KEY")
+    if not public_key:
+        raise HTTPException(status_code=500, detail="Llaves VAPID no configuradas")
+    return {"public_key": public_key}
+
+@app.post("/api/notifications/subscribe")
+def subscribe_notifications(
+    subscription: schemas.PushSubscriptionCreate,
+    current_user: schemas.TokenData = Depends(auth.get_current_user_token),
+    db: Session = Depends(get_db)
+):
+    crud.create_push_subscription(db, current_user.id, subscription)
+    return {"message": "Suscripción a notificaciones guardada con éxito."}
+
+@app.post("/api/notifications/unsubscribe")
+def unsubscribe_notifications(
+    subscription: schemas.PushSubscriptionCreate,
+    db: Session = Depends(get_db)
+):
+    crud.delete_push_subscription(db, subscription.endpoint)
+    return {"message": "Suscripción eliminada con éxito."}
+
+@app.post("/api/notifications/test")
+def test_push_notification(
+    current_user: schemas.TokenData = Depends(auth.get_current_user_token),
+    db: Session = Depends(get_db)
+):
+    subscriptions = crud.get_push_subscriptions_by_user(db, current_user.id)
+    if not subscriptions:
+        raise HTTPException(
+            status_code=400,
+            detail="No tienes suscripciones activas en este navegador/dispositivo."
+        )
+    
+    sent_count = 0
+    for sub in subscriptions:
+        res = send_push_notification(
+            endpoint=sub.endpoint,
+            p256dh=sub.p256dh,
+            auth=sub.auth,
+            title="🔔 Prueba de Notificación Push",
+            body="¡Felicidades! Las notificaciones de la Polla Mundialista están activas en tu dispositivo.",
+            url="/"
+        )
+        if res == "remove":
+            crud.delete_push_subscription(db, sub.endpoint)
+        elif res:
+            sent_count += 1
+            
+    if sent_count == 0:
+        raise HTTPException(status_code=500, detail="Error al enviar la notificación de prueba.")
+        
+    return {"message": f"Notificación de prueba enviada a {sent_count} dispositivos."}

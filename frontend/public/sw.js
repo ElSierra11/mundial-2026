@@ -38,8 +38,9 @@ self.addEventListener('fetch', (event) => {
   const url = event.request.url;
   const isSelfOrigin = url.startsWith(self.location.origin);
   const isAllowedExternal = url.includes('flagcdn.com') || url.includes('api.dicebear.com');
+  const isApiCall = url.includes('/api/');
   
-  if (event.request.method !== 'GET' || (!isSelfOrigin && !isAllowedExternal)) {
+  if (event.request.method !== 'GET' || (!isSelfOrigin && !isAllowedExternal) || isApiCall) {
     return;
   }
   
@@ -96,3 +97,56 @@ self.addEventListener('fetch', (event) => {
     })
   );
 });
+
+// Push Notification Event Listener
+self.addEventListener('push', (event) => {
+  let data = {};
+  if (event.data) {
+    try {
+      data = event.data.json();
+    } catch (e) {
+      data = { notification: { title: 'Polla Mundialista', body: event.data.text() } };
+    }
+  }
+
+  const notification = data.notification || {};
+  const title = notification.title || 'Polla Mundialista';
+  const options = {
+    body: notification.body || '¡Hay novedades en el mundial!',
+    icon: notification.icon || '/logo.png',
+    badge: '/favicon.svg', // smaller icon for status bar
+    data: notification.data || { url: '/' }
+  };
+
+  event.waitUntil(
+    self.registration.showNotification(title, options)
+  );
+});
+
+// Notification Click Event Listener
+self.addEventListener('notificationclick', (event) => {
+  event.notification.close();
+  
+  const targetUrl = event.notification.data?.url || '/';
+  
+  event.waitUntil(
+    clients.matchAll({ type: 'window', includeUncontrolled: true }).then((clientList) => {
+      // If a window is already open, navigate/focus it
+      for (const client of clientList) {
+        const url = new URL(client.url);
+        if (url.pathname === targetUrl || targetUrl === '/') {
+          return client.focus().then(() => {
+            if ('navigate' in client) {
+              return client.navigate(targetUrl);
+            }
+          });
+        }
+      }
+      // Otherwise, open a new window
+      if (clients.openWindow) {
+        return clients.openWindow(targetUrl);
+      }
+    })
+  );
+});
+
