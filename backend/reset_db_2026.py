@@ -14,7 +14,10 @@ try:
     if db.bind.dialect.name == "sqlite":
         db.execute(text("DELETE FROM predictions"))
         db.execute(text("DELETE FROM matches"))
-        db.execute(text("DELETE FROM sqlite_sequence WHERE name IN ('predictions', 'matches')"))
+        try:
+            db.execute(text("DELETE FROM sqlite_sequence WHERE name IN ('predictions', 'matches')"))
+        except Exception:
+            pass
     else:
         db.execute(text("TRUNCATE TABLE predictions, matches RESTART IDENTITY CASCADE"))
     db.commit()
@@ -175,25 +178,25 @@ try:
         models.Match(
             home_team="TBD", away_team="TBD", 
             home_flag_url=f"{flag_url}/un.png", away_flag_url=f"{flag_url}/un.png",
-            match_time=datetime(2026, 7, 11, 20, 0), stage="Cuartos de Final",
+            match_time=datetime(2026, 7, 9, 20, 0), stage="Cuartos de Final",
             status="scheduled"
         ),
         models.Match(
             home_team="TBD", away_team="TBD", 
             home_flag_url=f"{flag_url}/un.png", away_flag_url=f"{flag_url}/un.png",
-            match_time=datetime(2026, 7, 12, 20, 0), stage="Cuartos de Final",
+            match_time=datetime(2026, 7, 11, 21, 0), stage="Cuartos de Final",
             status="scheduled"
         ),
         models.Match(
             home_team="TBD", away_team="TBD", 
             home_flag_url=f"{flag_url}/un.png", away_flag_url=f"{flag_url}/un.png",
-            match_time=datetime(2026, 7, 13, 20, 0), stage="Cuartos de Final",
+            match_time=datetime(2026, 7, 10, 19, 0), stage="Cuartos de Final",
             status="scheduled"
         ),
         models.Match(
             home_team="TBD", away_team="TBD", 
             home_flag_url=f"{flag_url}/un.png", away_flag_url=f"{flag_url}/un.png",
-            match_time=datetime(2026, 7, 14, 20, 0), stage="Cuartos de Final",
+            match_time=datetime(2026, 7, 12, 1, 0), stage="Cuartos de Final",
             status="scheduled"
         ),
 

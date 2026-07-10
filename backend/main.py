@@ -1235,13 +1235,13 @@ def reset_database(
             models.Match(
                 home_team="TBD", away_team="TBD", 
                 home_flag_url=f"{flag_url}/un.png", away_flag_url=f"{flag_url}/un.png",
-                match_time=datetime(2026, 7, 10, 19, 0), stage="Cuartos de Final",
+                match_time=datetime(2026, 7, 11, 21, 0), stage="Cuartos de Final",
                 status="scheduled"
             ),
             models.Match(
                 home_team="TBD", away_team="TBD", 
                 home_flag_url=f"{flag_url}/un.png", away_flag_url=f"{flag_url}/un.png",
-                match_time=datetime(2026, 7, 11, 21, 0), stage="Cuartos de Final",
+                match_time=datetime(2026, 7, 10, 19, 0), stage="Cuartos de Final",
                 status="scheduled"
             ),
             models.Match(

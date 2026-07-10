@@ -52,10 +52,10 @@ const initialDemoMatches = [
   { id: 24, home_team: "Suiza / Argelia", away_team: "Colombia / Ghana", home_flag_url: "https://flagcdn.com/w160/un.png", away_flag_url: "https://flagcdn.com/w160/un.png", match_time: new Date("2026-07-07T21:00:00Z").toISOString(), stage: "Octavos de Final", home_score: null, away_score: null, status: "scheduled" },
 
   // Cuartos
-  { id: 25, home_team: "TBD", away_team: "TBD", home_flag_url: "https://flagcdn.com/w160/un.png", away_flag_url: "https://flagcdn.com/w160/un.png", match_time: new Date("2026-07-11T20:00:00Z").toISOString(), stage: "Cuartos de Final", home_score: null, away_score: null, status: "scheduled" },
-  { id: 26, home_team: "TBD", away_team: "TBD", home_flag_url: "https://flagcdn.com/w160/un.png", away_flag_url: "https://flagcdn.com/w160/un.png", match_time: new Date("2026-07-12T20:00:00Z").toISOString(), stage: "Cuartos de Final", home_score: null, away_score: null, status: "scheduled" },
-  { id: 27, home_team: "TBD", away_team: "TBD", home_flag_url: "https://flagcdn.com/w160/un.png", away_flag_url: "https://flagcdn.com/w160/un.png", match_time: new Date("2026-07-13T20:00:00Z").toISOString(), stage: "Cuartos de Final", home_score: null, away_score: null, status: "scheduled" },
-  { id: 28, home_team: "TBD", away_team: "TBD", home_flag_url: "https://flagcdn.com/w160/un.png", away_flag_url: "https://flagcdn.com/w160/un.png", match_time: new Date("2026-07-14T20:00:00Z").toISOString(), stage: "Cuartos de Final", home_score: null, away_score: null, status: "scheduled" },
+  { id: 25, home_team: "TBD", away_team: "TBD", home_flag_url: "https://flagcdn.com/w160/un.png", away_flag_url: "https://flagcdn.com/w160/un.png", match_time: new Date("2026-07-09T20:00:00Z").toISOString(), stage: "Cuartos de Final", home_score: null, away_score: null, status: "scheduled" },
+  { id: 26, home_team: "TBD", away_team: "TBD", home_flag_url: "https://flagcdn.com/w160/un.png", away_flag_url: "https://flagcdn.com/w160/un.png", match_time: new Date("2026-07-11T21:00:00Z").toISOString(), stage: "Cuartos de Final", home_score: null, away_score: null, status: "scheduled" },
+  { id: 27, home_team: "TBD", away_team: "TBD", home_flag_url: "https://flagcdn.com/w160/un.png", away_flag_url: "https://flagcdn.com/w160/un.png", match_time: new Date("2026-07-10T19:00:00Z").toISOString(), stage: "Cuartos de Final", home_score: null, away_score: null, status: "scheduled" },
+  { id: 28, home_team: "TBD", away_team: "TBD", home_flag_url: "https://flagcdn.com/w160/un.png", away_flag_url: "https://flagcdn.com/w160/un.png", match_time: new Date("2026-07-12T01:00:00Z").toISOString(), stage: "Cuartos de Final", home_score: null, away_score: null, status: "scheduled" },
 
   // Semis
   { id: 29, home_team: "TBD", away_team: "TBD", home_flag_url: "https://flagcdn.com/w160/un.png", away_flag_url: "https://flagcdn.com/w160/un.png", match_time: new Date("2026-07-15T20:00:00Z").toISOString(), stage: "Semifinal", home_score: null, away_score: null, status: "scheduled" },
@@ -132,6 +132,28 @@ const initDemoStorage = () => {
         }
       } catch (e) {}
     }
+  } else {
+    // Migrate existing matches in localStorage to correct the quarterfinals dates
+    try {
+      const parsed = JSON.parse(existingMatches);
+      let updated = false;
+      const correctTimes = {
+        25: "2026-07-09T20:00:00Z",
+        26: "2026-07-11T21:00:00Z",
+        27: "2026-07-10T19:00:00Z",
+        28: "2026-07-12T01:00:00Z"
+      };
+      const updatedMatches = parsed.map(m => {
+        if (correctTimes[m.id] && m.match_time !== correctTimes[m.id]) {
+          updated = true;
+          return { ...m, match_time: correctTimes[m.id] };
+        }
+        return m;
+      });
+      if (updated) {
+        localStorage.setItem("demo_matches", JSON.stringify(updatedMatches));
+      }
+    } catch (e) {}
   }
 
   if (!localStorage.getItem("demo_users")) {
