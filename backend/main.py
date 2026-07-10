@@ -331,9 +331,48 @@ async def send_email_reminders_loop():
             
         await asyncio.sleep(60)  # Check every 1 minute to avoid missing intervals
 
+def auto_update_match_times():
+    db = SessionLocal()
+    try:
+        # Match mappings with correct UTC times (for Colombia COT = UTC-5)
+        correct_times = {
+            25: datetime(2026, 7, 9, 20, 0),    # Francia vs Marruecos (3:00 p.m. COT)
+            26: datetime(2026, 7, 11, 21, 0),   # Noruega vs Inglaterra (4:00 p.m. COT)
+            27: datetime(2026, 7, 10, 19, 0),   # España vs Bélgica (2:00 p.m. COT)
+            28: datetime(2026, 7, 12, 1, 0),    # Argentina vs Suiza (8:00 p.m. COT)
+            29: datetime(2026, 7, 14, 19, 0),   # Semifinal 1 (2:00 p.m. COT)
+            30: datetime(2026, 7, 15, 19, 0),   # Semifinal 2 (2:00 p.m. COT)
+            31: datetime(2026, 7, 18, 21, 0),   # 3er Puesto (4:00 p.m. COT)
+            32: datetime(2026, 7, 19, 19, 0)    # Final (2:00 p.m. COT)
+        }
+        
+        updated_count = 0
+        for match_id, new_time in correct_times.items():
+            match = db.query(models.Match).filter(models.Match.id == match_id).first()
+            if match and match.match_time != new_time:
+                old_time = match.match_time
+                match.match_time = new_time
+                print(f"[AUTO-MIGRATION] Updating Match ID {match_id}: {old_time} -> {new_time}")
+                updated_count += 1
+                
+        if updated_count > 0:
+            db.commit()
+            print(f"[AUTO-MIGRATION] Successfully updated {updated_count} matches in the database.")
+    except Exception as e:
+        db.rollback()
+        print(f"[AUTO-MIGRATION ERROR] Error updating match times: {e}")
+    finally:
+        db.close()
+
 @asynccontextmanager
 async def lifespan(application):
     """Arranca los loops de sincronización y recordatorios al iniciar el servidor."""
+    # Ejecutar migración automática de horarios al arrancar
+    try:
+        auto_update_match_times()
+    except Exception as e:
+        print(f"[AUTO-MIGRATION ERROR] Failed to run: {e}")
+        
     task_sync = asyncio.create_task(live_sync.live_score_sync_loop())
     task_emails = asyncio.create_task(send_email_reminders_loop())
     yield
@@ -1255,13 +1294,13 @@ def reset_database(
             models.Match(
                 home_team="TBD", away_team="TBD", 
                 home_flag_url=f"{flag_url}/un.png", away_flag_url=f"{flag_url}/un.png",
-                match_time=datetime(2026, 7, 15, 0, 0), stage="Semifinal",
+                match_time=datetime(2026, 7, 14, 19, 0), stage="Semifinal",
                 status="scheduled"
             ),
             models.Match(
                 home_team="TBD", away_team="TBD", 
                 home_flag_url=f"{flag_url}/un.png", away_flag_url=f"{flag_url}/un.png",
-                match_time=datetime(2026, 7, 16, 0, 0), stage="Semifinal",
+                match_time=datetime(2026, 7, 15, 19, 0), stage="Semifinal",
                 status="scheduled"
             ),
 
@@ -1269,7 +1308,7 @@ def reset_database(
             models.Match(
                 home_team="TBD", away_team="TBD", 
                 home_flag_url=f"{flag_url}/un.png", away_flag_url=f"{flag_url}/un.png",
-                match_time=datetime(2026, 7, 18, 19, 0), stage="3er Puesto",
+                match_time=datetime(2026, 7, 18, 21, 0), stage="3er Puesto",
                 status="scheduled"
             ),
 

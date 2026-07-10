@@ -204,13 +204,13 @@ try:
         models.Match(
             home_team="TBD", away_team="TBD", 
             home_flag_url=f"{flag_url}/un.png", away_flag_url=f"{flag_url}/un.png",
-            match_time=datetime(2026, 7, 15, 20, 0), stage="Semifinal",
+            match_time=datetime(2026, 7, 14, 19, 0), stage="Semifinal",
             status="scheduled"
         ),
         models.Match(
             home_team="TBD", away_team="TBD", 
             home_flag_url=f"{flag_url}/un.png", away_flag_url=f"{flag_url}/un.png",
-            match_time=datetime(2026, 7, 16, 20, 0), stage="Semifinal",
+            match_time=datetime(2026, 7, 15, 19, 0), stage="Semifinal",
             status="scheduled"
         ),
 
@@ -218,7 +218,7 @@ try:
         models.Match(
             home_team="TBD", away_team="TBD", 
             home_flag_url=f"{flag_url}/un.png", away_flag_url=f"{flag_url}/un.png",
-            match_time=datetime(2026, 7, 18, 20, 0), stage="3er Puesto",
+            match_time=datetime(2026, 7, 18, 21, 0), stage="3er Puesto",
             status="scheduled"
         ),
 
@@ -226,7 +226,7 @@ try:
         models.Match(
             home_team="TBD", away_team="TBD", 
             home_flag_url=f"{flag_url}/un.png", away_flag_url=f"{flag_url}/un.png",
-            match_time=datetime(2026, 7, 19, 20, 0), stage="Final",
+            match_time=datetime(2026, 7, 19, 19, 0), stage="Final",
             status="scheduled"
         )
     ]

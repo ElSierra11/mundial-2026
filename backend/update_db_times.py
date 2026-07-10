@@ -9,10 +9,14 @@ def update_times():
     try:
         # Match mappings
         correct_times = {
-            25: datetime(2026, 7, 9, 20, 0),    # Francia vs Marruecos
-            26: datetime(2026, 7, 11, 21, 0),   # Noruega vs Inglaterra
-            27: datetime(2026, 7, 10, 19, 0),   # España vs Bélgica
-            28: datetime(2026, 7, 12, 1, 0)     # Argentina vs Suiza
+            25: datetime(2026, 7, 9, 20, 0),    # Francia vs Marruecos (3:00 p.m. COT)
+            26: datetime(2026, 7, 11, 21, 0),   # Noruega vs Inglaterra (4:00 p.m. COT)
+            27: datetime(2026, 7, 10, 19, 0),   # España vs Bélgica (2:00 p.m. COT)
+            28: datetime(2026, 7, 12, 1, 0),    # Argentina vs Suiza (8:00 p.m. COT)
+            29: datetime(2026, 7, 14, 19, 0),   # Semifinal 1 (2:00 p.m. COT)
+            30: datetime(2026, 7, 15, 19, 0),   # Semifinal 2 (2:00 p.m. COT)
+            31: datetime(2026, 7, 18, 21, 0),   # 3er Puesto (4:00 p.m. COT)
+            32: datetime(2026, 7, 19, 19, 0)    # Final (2:00 p.m. COT)
         }
         
         updated_count = 0
