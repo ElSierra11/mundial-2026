@@ -226,16 +226,24 @@ def update_match_results(db: Session, match_id: int, home_score: int, away_score
     if not db_match:
         return None
     
-    if home_score is not None:
-        db_match.home_score = home_score
-    if away_score is not None:
-        db_match.away_score = away_score
-    if home_penalties is not None:
-        db_match.home_penalties = home_penalties
-    if away_penalties is not None:
-        db_match.away_penalties = away_penalties
-    if penalties_winner is not None:
-        db_match.penalties_winner = penalties_winner
+    if status == "scheduled":
+        db_match.home_score = None
+        db_match.away_score = None
+        db_match.home_penalties = None
+        db_match.away_penalties = None
+        db_match.penalties_winner = None
+    else:
+        if home_score is not None:
+            db_match.home_score = home_score
+        if away_score is not None:
+            db_match.away_score = away_score
+        if home_penalties is not None:
+            db_match.home_penalties = home_penalties
+        if away_penalties is not None:
+            db_match.away_penalties = away_penalties
+        if penalties_winner is not None:
+            db_match.penalties_winner = penalties_winner
+            
     if status is not None:
         db_match.status = status
     if home_team is not None:

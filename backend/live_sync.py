@@ -318,6 +318,14 @@ def sync_scores_to_db(events: list[dict]):
                     target_home_penalties = espn_home_penalties
                     target_away_penalties = espn_away_penalties
 
+                # If the match has not started (scheduled), ensure scores and penalties are cleared (None)
+                if espn_status == "scheduled":
+                    target_home_score = None
+                    target_away_score = None
+                    target_home_penalties = None
+                    target_away_penalties = None
+                    espn_penalties_winner = None
+
                 # Solo actualizar si hay cambios reales
                 status_changed = (db_match.status != espn_status)
                 score_changed = (

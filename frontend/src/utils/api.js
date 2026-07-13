@@ -418,11 +418,19 @@ export const api = {
       const matchIndex = matches.findIndex(m => m.id === matchId);
       if (matchIndex === -1) throw new Error("Partido no encontrado");
 
-      if (homeScore !== null && homeScore !== '') matches[matchIndex].home_score = parseInt(homeScore);
-      if (awayScore !== null && awayScore !== '') matches[matchIndex].away_score = parseInt(awayScore);
-      if (homePenalties !== null && homePenalties !== '') matches[matchIndex].home_penalties = parseInt(homePenalties);
-      if (awayPenalties !== null && awayPenalties !== '') matches[matchIndex].away_penalties = parseInt(awayPenalties);
-      if (penaltiesWinner) matches[matchIndex].penalties_winner = penaltiesWinner;
+      if (status === 'scheduled') {
+        matches[matchIndex].home_score = null;
+        matches[matchIndex].away_score = null;
+        matches[matchIndex].home_penalties = null;
+        matches[matchIndex].away_penalties = null;
+        matches[matchIndex].penalties_winner = null;
+      } else {
+        if (homeScore !== null && homeScore !== '') matches[matchIndex].home_score = parseInt(homeScore);
+        if (awayScore !== null && awayScore !== '') matches[matchIndex].away_score = parseInt(awayScore);
+        if (homePenalties !== null && homePenalties !== '') matches[matchIndex].home_penalties = parseInt(homePenalties);
+        if (awayPenalties !== null && awayPenalties !== '') matches[matchIndex].away_penalties = parseInt(awayPenalties);
+        if (penaltiesWinner) matches[matchIndex].penalties_winner = penaltiesWinner;
+      }
       if (status) matches[matchIndex].status = status;
       if (homeTeam) {
         matches[matchIndex].home_team = homeTeam;
