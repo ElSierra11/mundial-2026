@@ -368,8 +368,8 @@ export default function BracketView({ matches, predictions, lastSync }) {
 
     // Semis (29 and 30)
     const semisMapping = {
-      29: [25, 26],
-      30: [27, 28]
+      29: [25, 27],
+      30: [26, 28]
     };
 
     Object.entries(semisMapping).forEach(([sid, [hId, aId]]) => {
@@ -451,7 +451,9 @@ export default function BracketView({ matches, predictions, lastSync }) {
 
   const r32      = pad(sortedR32, 16);
   const octavos  = pad(sortedOctavos, 8);
-  const cuartos  = pad(effectiveMatches.filter(m => m.stage === 'Cuartos de Final').sort((a,b) => a.id - b.id), 4);
+  const rawCuartos = effectiveMatches.filter(m => m.stage === 'Cuartos de Final');
+  const sortedCuartos = [25, 27, 26, 28].map(id => rawCuartos.find(m => m.id === id) || null);
+  const cuartos  = pad(sortedCuartos, 4);
   const semis    = pad(effectiveMatches.filter(m => m.stage === 'Semifinal').sort((a,b) => a.id - b.id), 2);
   const tercero  = effectiveMatches.filter(m => m.stage === '3er Puesto');
   const finalArr = effectiveMatches.filter(m => m.stage === 'Final');
